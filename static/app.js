@@ -15,7 +15,7 @@ let dragOrigStartUs = 0;
 // AI Agent & Bounding Box State
 let detectedErrors = [];
 let currentErrorFilter = 'all';
-let showBBoxOverlay = true;
+let showBBoxOverlay = false;
 let isAgentAutoRunning = false;
 let agentAutoTimer = null;
 let agentFixedIds = new Set();
@@ -1686,36 +1686,46 @@ function handleColorAdjust(type, val) {
   else if (type === 'saturation') canvas.style.filter = `saturate(${1 + val/100})`;
 }
 
-// Render media thumbnails
+// Render media thumbnails hiện đại chuẩn Studio
 function renderMediaTab() {
   const grid = document.getElementById('mediaGrid');
+  if (!grid) return;
   grid.innerHTML = '';
   if (!projectData) return;
   
   let mediaFound = 0;
   projectData.tracks.forEach((t, tIdx) => {
-    t.segments.forEach(s => {
+    (t.segments || []).forEach(s => {
       if (s.media_path) {
         mediaFound++;
         const card = document.createElement('div');
         card.className = 'media-card';
         
-        const ext = s.media_path.toLowerCase().split('.').pop();
-        const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext);
+        const ext = (s.media_path.split('.').pop() || 'mp4').toUpperCase();
+        const isVideo = ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'].includes(ext);
         const streamUrl = `/api/media?path=${encodeURIComponent(s.media_path)}`;
+        const durSec = ((s.end_us - s.start_us) / 1e6).toFixed(1);
         
         card.innerHTML = `
           <div class="media-thumb">
             ${isVideo
-              ? `<video src="${streamUrl}" preload="metadata" muted style="width:100%;height:70px;object-fit:cover;" onloadedmetadata="this.currentTime=1"></video>`
-              : `<img src="${streamUrl}" style="width:100%;height:70px;object-fit:cover;" onerror="this.style.display='none'" />`
+              ? `<video src="${streamUrl}" preload="metadata" muted class="thumb-video" onloadedmetadata="this.currentTime=1" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';"></video>
+                 <div class="thumb-fallback" style="display:none;">🎬</div>`
+              : `<img src="${streamUrl}" class="thumb-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+                 <div class="thumb-fallback" style="display:none;">🖼️</div>`
             }
+            <div class="media-play-overlay">▶</div>
+            <span class="media-badge-dur">${durSec}s</span>
+            <span class="media-badge-ext">${esc(ext)}</span>
           </div>
-          <div class="media-name" title="${esc(s.label)}">${esc(s.label)}</div>
+          <div class="media-info-row">
+            <div class="media-name" title="${esc(s.label)}">${esc(s.label)}</div>
+            <div class="media-meta">Track ${tIdx + 1}</div>
+          </div>
         `;
         card.onclick = () => {
           updatePlayheadPosition(s.start_us);
-          selectClip(s, tIdx);   // Fix: use tIdx not t.index
+          selectClip(s, tIdx);
         };
         grid.appendChild(card);
       }
@@ -1723,7 +1733,13 @@ function renderMediaTab() {
   });
   
   if (mediaFound === 0) {
-    grid.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; grid-column: span 2; padding: 12px; text-align: center;">Chưa có video nội bộ trong project này. Dự án gồm Text và Sticker.</div>';
+    grid.innerHTML = `
+      <div class="empty-media-box">
+        <div class="empty-media-icon">🎬</div>
+        <div class="empty-media-title">Chưa có footage video</div>
+        <div class="empty-media-sub">Dự án hiện tại gồm các lớp Text và Hiệu ứng. Kéo thả tệp video vào timeline để bắt đầu.</div>
+      </div>
+    `;
   }
 }
 

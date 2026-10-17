@@ -1,63 +1,61 @@
 /* ==========================================================================
-   CAPCUT WEB STUDIO & AI CO-DIRECTOR — PROFESSIONAL MINIMAL DESIGN SYSTEM
-   Phát triển theo phong cách Linear / Figma / CapCut PC: Dark, MỘT accent color,
-   tập trung vào nội dung video, không neon glow, không gradient lòe loẹt.
+   CAPCUT WEB STUDIO & AI CO-DIRECTOR — PROFESSIONAL STUDIO DARK DESIGN SYSTEM
    ========================================================================== */
 
 :root {
-  /* Nền 3 mức (Gần đen, hơi ánh xanh slate tinh tế) */
-  --bg-app: #0e1116;
-  --bg-panel: #151921;
-  --bg-panel-secondary: #1c212c;
-  --bg-surface: #242b38;
-  --bg-hover: #2d3545;
-  --bg-active: #374154;
+  /* Nền Studio Cao Cấp (Deep Cinematic Dark) */
+  --bg-app: #090b10;
+  --bg-panel: #11141c;
+  --bg-panel-secondary: #161a24;
+  --bg-surface: #1e2330;
+  --bg-hover: #262c3d;
+  --bg-active: #31384d;
 
-  /* Viền mảnh tinh gọn */
-  --border-subtle: #232936;
-  --border-medium: #2e3646;
-  --border-strong: #3d475a;
+  /* Glassmorphism & Viền kim loại mỏng */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --glass-bg: rgba(17, 20, 28, 0.82);
 
-  /* Text 3 cấp đạt tương phản chuẩn WCAG AA >= 4.5:1 */
-  --text-main: #f1f5f9;      /* Contrast ~13.5:1 với #0e1116 */
-  --text-muted: #94a3b8;     /* Contrast ~6.2:1 */
-  --text-disabled: #64748b;  /* Contrast ~3.5:1 dùng cho text phụ/disabled */
+  /* Text 3 cấp chuẩn WCAG AAA & AA */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-disabled: #64748b;
 
-  /* DUY NHẤT MỘT MÀU ACCENT (Xanh công nghệ hiện đại) */
-  --accent: #2563eb;
-  --accent-hover: #3b82f6;
-  --accent-active: #1d4ed8;
-  --accent-subtle: rgba(37, 99, 235, 0.15);
+  /* Accent CapCut Cyan / Electric Blue Luxury */
+  --accent: #00d2ff;
+  --accent-gradient: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+  --accent-hover: #38bdf8;
+  --accent-active: #0284c7;
+  --accent-subtle: rgba(0, 210, 255, 0.12);
+  --accent-glow: 0 0 18px rgba(0, 210, 255, 0.35);
 
-  /* Màu ngữ nghĩa: ĐỎ CHỈ DÀNH RIÊNG CHO LỖI */
-  --color-error: #ef4444;
-  --color-error-bg: rgba(239, 68, 68, 0.12);
-  --color-error-border: #dc2626;
+  /* Màu ngữ nghĩa kiểm định */
+  --color-error: #f43f5e;
+  --color-error-bg: rgba(244, 63, 94, 0.12);
+  --color-error-border: rgba(244, 63, 94, 0.4);
 
   --color-warning: #f59e0b;
   --color-warning-bg: rgba(245, 158, 11, 0.12);
-  --color-warning-border: #d97706;
+  --color-warning-border: rgba(245, 158, 11, 0.4);
 
   --color-success: #10b981;
   --color-success-bg: rgba(16, 185, 129, 0.12);
-  --color-success-border: #059669;
+  --color-success-border: rgba(16, 185, 129, 0.4);
 
-  /* Màu track NGỮ NGHĨA (KHÔNG dùng đỏ/cam):
-     Video: xanh dương, Audio: teal, BGM: tím nhạt, Chữ: tím/indigo, FX: magenta, Sticker: vàng hổ phách */
+  /* Phối màu Track chuyên nghiệp (Audio, Video, Text) */
   --track-video: #2563eb;
-  --track-video-hover: #3b82f6;
-  --track-audio: #0d9488;
-  --track-audio-hover: #14b8a6;
+  --track-video-bg: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  --track-audio: #059669;
+  --track-audio-bg: linear-gradient(180deg, #10b981 0%, #047857 100%);
   --track-bgm: #7c3aed;
-  --track-bgm-hover: #8b5cf6;
+  --track-bgm-bg: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
   --track-text: #6366f1;
-  --track-text-hover: #818cf8;
+  --track-text-bg: linear-gradient(180deg, #818cf8 0%, #4f46e5 100%);
   --track-effect: #db2777;
-  --track-effect-hover: #ec4899;
   --track-sticker: #d97706;
-  --track-sticker-hover: #f59e0b;
 
-  /* Spacing lưới 4px / 8px */
+  /* Spacing */
   --sp-2xs: 2px;
   --sp-xs: 4px;
   --sp-sm: 8px;
@@ -69,12 +67,14 @@
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
 
-  /* Bóng đổ tinh gọn (Loại bỏ hoàn toàn neon glow) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45);
+  /* Shadows Studio */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.65);
+  --shadow-bezel: 0 24px 60px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.12);
 
   /* Font chữ */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -161,12 +161,14 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ==========================================================================
-   1. APP HEADER (48px CHUẨN MINIMAL)
+   1. APP HEADER (48px CHUẨN STUDIO GLASSMORPHISM)
    ========================================================================== */
 .app-header {
   height: 48px;
   min-height: 48px;
-  background-color: var(--bg-panel);
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -174,6 +176,7 @@ input:focus, select:focus, textarea:focus {
   padding: 0 var(--sp-lg);
   gap: var(--sp-md);
   z-index: 50;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
 .header-left {
@@ -188,37 +191,43 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.4));
 }
 
 .app-brand-title {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 60%, var(--text-muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .project-selector select {
-  height: 30px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  height: 32px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
   padding: 0 10px;
   font-size: 12px;
   font-weight: 500;
-  max-width: 240px;
+  color: var(--text-main);
+  max-width: 260px;
   cursor: pointer;
+  transition: all 140ms ease;
 }
 
 .project-selector select:hover {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Banner cảnh báo CapCut đang mở (Mục 2.3) */
 .capcut-status-banner {
-  background-color: var(--color-warning-bg);
-  border: 1px solid var(--color-warning-border);
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   color: #fbbf24;
-  padding: 4px 12px;
+  padding: 3px 12px;
   border-radius: var(--radius-full);
   font-size: 11px;
   font-weight: 500;
@@ -227,6 +236,7 @@ input:focus, select:focus, textarea:focus {
   gap: var(--sp-xs);
   margin: 0 auto;
   white-space: nowrap;
+  backdrop-filter: blur(8px);
 }
 
 .header-right {
@@ -237,30 +247,39 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-hdr {
-  height: 30px;
+  height: 32px;
   padding: 0 12px;
   border-radius: var(--radius-sm);
-  background-color: var(--bg-surface);
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
   font-weight: 500;
+  font-size: 12px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  transition: all 140ms ease;
 }
 
 .btn-hdr:hover {
-  background-color: var(--bg-hover);
+  background-color: rgba(255, 255, 255, 0.08);
   border-color: var(--border-medium);
+  transform: translateY(-1px);
 }
 
 .btn-hdr:active {
-  background-color: var(--bg-active);
+  transform: translateY(0);
 }
 
 .btn-hdr-qa {
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.25);
+  background-color: rgba(245, 158, 11, 0.06);
+}
+
+.btn-hdr-qa:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  background-color: rgba(245, 158, 11, 0.12);
 }
 
 .qa-dot {
@@ -268,18 +287,21 @@ input:focus, select:focus, textarea:focus {
   height: 7px;
   border-radius: 50%;
   background-color: var(--color-warning);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
 }
 
 .btn-hdr-accent {
-  background-color: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0, 210, 255, 0.35);
 }
 
 .btn-hdr-accent:hover {
-  background-color: var(--accent-hover);
-  border-color: var(--accent-hover);
+  box-shadow: 0 4px 16px rgba(0, 210, 255, 0.5);
+  transform: translateY(-1px);
+  color: #ffffff;
 }
 
 /* ==========================================================================
@@ -618,6 +640,167 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ==========================================================================
+   KHO FOOTAGE & MEDIA GRID CARD STYLE STUDIO
+   ========================================================================== */
+.media-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-md);
+  padding-bottom: var(--sp-sm);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.media-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.media-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 180ms ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.media-thumb {
+  height: 84px;
+  background-color: #000;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-thumb video, .media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: radial-gradient(circle, #1a202c 0%, #0d1117 100%);
+  color: var(--text-muted);
+}
+
+.media-play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.media-card:hover .media-play-overlay {
+  opacity: 1;
+}
+
+.media-badge-dur {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.media-badge-ext {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(0, 210, 255, 0.85);
+  color: #000;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+}
+
+.media-info-row {
+  padding: 8px;
+  background-color: var(--bg-panel-secondary);
+}
+
+.media-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.empty-media-box {
+  grid-column: span 2;
+  padding: 32px 16px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-md);
+}
+
+.empty-media-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+.empty-media-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.empty-media-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
    CỘT 2 (GIỮA): TRÌNH PHÁT PREVIEW (9:16 CĂN GIỮA, FIT HEIGHT TO RÕ)
    ========================================================================== */
 .panel-player {
@@ -664,7 +847,7 @@ input:focus, select:focus, textarea:focus {
   padding: var(--sp-md);
   overflow: hidden;
   position: relative;
-  background: radial-gradient(circle at center, #141820 0%, #0a0c10 100%);
+  background: radial-gradient(circle at center, #151a26 0%, #07090d 100%);
 }
 
 .player-canvas {
@@ -672,11 +855,11 @@ input:focus, select:focus, textarea:focus {
   max-height: 100%;
   aspect-ratio: 9 / 16;
   background-color: #000000;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
   position: relative;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-bezel);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -699,7 +882,7 @@ input:focus, select:focus, textarea:focus {
   font-size: 18px;
   font-weight: 700;
   pointer-events: none;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.85);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
   z-index: 10;
 }
 
@@ -712,29 +895,39 @@ input:focus, select:focus, textarea:focus {
 
 .error-bbox {
   position: absolute;
-  border: 2px solid var(--color-error);
-  background-color: rgba(239, 68, 68, 0.12);
+  border: 1.5px dashed rgba(244, 63, 94, 0.7);
+  background-color: rgba(244, 63, 94, 0.04);
   border-radius: var(--radius-xs);
   display: flex;
   align-items: flex-start;
   padding: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.error-bbox:hover {
+  border-color: #f43f5e;
+  background-color: rgba(244, 63, 94, 0.1);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
 }
 
 .error-bbox-tag {
-  background-color: var(--color-error);
+  background-color: rgba(244, 63, 94, 0.9);
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 2px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
 }
 
 .tiktok-safe-guide {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  border-top: 1px dashed rgba(255, 255, 255, 0.25);
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.25);
+  border-top: 1px dashed rgba(0, 229, 255, 0.35);
+  border-bottom: 1px dashed rgba(0, 229, 255, 0.35);
   display: none;
   z-index: 12;
 }
@@ -748,61 +941,79 @@ input:focus, select:focus, textarea:focus {
   bottom: 16%;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.65);
-  color: var(--text-muted);
+  background-color: rgba(0, 0, 0, 0.75);
+  color: var(--accent);
   font-size: 11px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 10px;
   border-radius: var(--radius-full);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  backdrop-filter: blur(4px);
 }
 
 /* THANH ĐIỀU KHIỂN DƯỚI PREVIEW (CHỨA TIMECODE DUY NHẤT) */
 .player-controls {
-  height: 44px;
-  min-height: 44px;
-  background-color: var(--bg-panel);
+  height: 48px;
+  min-height: 48px;
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-lg);
-  gap: var(--sp-md);
 }
 
 .play-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background-color: var(--accent);
+  background: var(--accent-gradient);
   color: #ffffff;
-  display: flex;
+  font-size: 13px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.35);
+  transition: all 140ms ease;
+  padding-left: 2px;
 }
 
 .play-btn:hover {
-  background-color: var(--accent-hover);
+  transform: scale(1.06);
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.55);
 }
 
-/* TIMECODE DUY NHẤT TRÊN TOÀN GIAO DIỆN (Tabular numbers + Mono) */
+.play-btn:active {
+  transform: scale(0.96);
+}
+
 .timecode-display {
   display: flex;
   align-items: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  padding: 4px 10px;
+  font-size: 12px;
+  background-color: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
-  color: var(--text-main);
+  padding: 4px 12px;
 }
 
-.tc-digits {
+#currentTimecode {
+  color: #00e5ff;
+  font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.tc-sep {
+  color: var(--text-disabled);
+}
+
+#totalTimecode {
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
 }
 
 .tc-sep {
@@ -1467,23 +1678,25 @@ input:focus, select:focus, textarea:focus {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: 1.5px;
   pointer-events: none;
-  z-index: 30;
+  z-index: 35;
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
 }
 
 .playhead-head {
-  width: 11px;
+  width: 12px;
   height: 14px;
-  background-color: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #00d2ff 100%);
   clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%);
   transform: translateX(-50%);
+  box-shadow: 0 2px 6px rgba(0, 210, 255, 0.5);
 }
 
 .playhead-line {
-  width: 1px;
+  width: 1.5px;
   height: 100%;
-  background-color: #ffffff;
+  background: linear-gradient(180deg, #00d2ff 0%, rgba(0, 210, 255, 0.4) 100%);
   transform: translateX(-50%);
 }
 
@@ -1501,9 +1714,9 @@ input:focus, select:focus, textarea:focus {
   position: relative;
 }
 
-/* Track 28px cho video/text/fx, 36px cho audio */
+/* Track 30px cho video/text/fx, 36px cho audio */
 .track-video, .track-text, .track-effect, .track-adjust, .track-sticker {
-  height: 28px;
+  height: 30px;
 }
 
 .track-audio {
@@ -1549,44 +1762,51 @@ input:focus, select:focus, textarea:focus {
   flex: 1;
   position: relative;
   background-color: var(--bg-app);
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 85px 100%;
 }
 
-/* Timeline Clip styling */
+/* Timeline Clip styling Studio */
 .timeline-clip {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
-  padding: 0 6px;
+  padding: 0 8px;
   font-size: 11px;
+  font-weight: 500;
   color: #ffffff;
   cursor: pointer;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  transition: filter 120ms ease, border-color 120ms ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: all 120ms ease;
+  backdrop-filter: blur(4px);
 }
 
 .timeline-clip:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  transform: translateY(-0.5px);
 }
 
 .timeline-clip.selected {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
-  z-index: 5;
+  box-shadow: 0 0 12px rgba(0, 210, 255, 0.5);
+  z-index: 10;
 }
 
-/* Track colors theo chuẩn */
-.clip-video { background-color: var(--track-video); }
-.clip-audio { background-color: var(--track-audio); }
-.clip-text { background-color: var(--track-text); }
-.clip-effect { background-color: var(--track-effect); }
-.clip-sticker { background-color: var(--track-sticker); }
+/* Track colors theo chuẩn Gradient tinh tế */
+.clip-video { background: var(--track-video-bg); }
+.clip-audio { background: var(--track-audio-bg); }
+.clip-text { background: var(--track-text-bg); }
+.clip-effect { background: linear-gradient(180deg, #ec4899 0%, #be185d 100%); }
+.clip-sticker { background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%); }
 
 /* Clip có lỗi: VIỀN ĐỎ + ICON CẢNH BÁO, KHÔNG TÔ NỀN ĐỎ */
 .timeline-clip.has-error {
