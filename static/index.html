@@ -41,6 +41,7 @@
       </button>
       <button class="btn-hdr btn-hdr-qa" onclick="openQAModal()" title="Kiểm định chất lượng dự án">
         <span class="qa-dot" id="headerQaDot"></span> Lỗi (<span id="headerErrCount">0</span>)
+      </button>
       <button class="btn-hdr btn-hdr-accent" onclick="saveDraftAction()" title="Thay đổi được ghi trực tiếp vào draft CapCut" aria-label="Lưu dự án">
         <span class="btn-hdr-icon">💾</span> Lưu
       </button>
@@ -52,17 +53,17 @@
     <!-- CỘT 1 (TRÁI): THƯ VIỆN & CÔNG CỤ (~300px) -->
     <section class="panel-assets" id="panelAssets">
       <div class="asset-tab-bar" role="tablist">
-        <button class="asset-tab active" onclick="switchAssetTab('scanner', this)" id="tabScannerBtn" title="Quét lỗi footage & timeline" role="tab" aria-selected="true"><span class="tab-icon">🎯</span> Lỗi <span class="tab-err-badge" id="tabErrBadge">0</span></button>
-        <button class="asset-tab" onclick="switchAssetTab('media', this)" title="Footage video" role="tab"><span class="tab-icon">📁</span> Footage</button>
+        <button class="asset-tab active" onclick="switchAssetTab('media', this)" id="tabMediaBtn" title="Footage video" role="tab" aria-selected="true"><span class="tab-icon">📁</span> Footage</button>
         <button class="asset-tab" onclick="switchAssetTab('text', this)" title="Văn bản & Phụ đề" role="tab"><span class="tab-icon">🔤</span> Chữ</button>
         <button class="asset-tab" onclick="switchAssetTab('effects', this)" title="Hiệu ứng video" role="tab"><span class="tab-icon">🪄</span> FX</button>
         <button class="asset-tab" onclick="switchAssetTab('transitions', this)" title="Chuyển tiếp" role="tab"><span class="tab-icon">⚡</span> Chuyển</button>
         <button class="asset-tab" onclick="switchAssetTab('adjust', this)" title="Điều chỉnh màu sắc" role="tab"><span class="tab-icon">🎚️</span> Chỉnh</button>
+        <button class="asset-tab" onclick="switchAssetTab('scanner', this)" id="tabScannerBtn" title="Quét lỗi footage & timeline" role="tab"><span class="tab-icon">🎯</span> Lỗi <span class="tab-err-badge" id="tabErrBadge">0</span></button>
       </div>
       
       <div class="asset-tab-content">
         <!-- TAB 0: FOOTAGE ERROR SCANNER & BOUNDING BOX LIST -->
-        <div class="tab-pane active" id="pane-scanner" role="tabpanel">
+        <div class="tab-pane" id="pane-scanner" role="tabpanel">
           <div class="scanner-header-card">
             <div class="scanner-top-row">
               <div class="score-mini-dial" id="scannerScoreDial">85</div>
@@ -95,7 +96,7 @@
         </div>
 
         <!-- TAB 1: MEDIA -->
-        <div class="tab-pane" id="pane-media" role="tabpanel">
+        <div class="tab-pane active" id="pane-media" role="tabpanel">
           <div class="media-header">
             <span class="media-title">Kho Footage & Video Dự Án</span>
             <button class="btn-sm" onclick="showToast('Đã sẵn sàng kéo thả video vào timeline', 'info')">+ Thêm tệp</button>
@@ -111,16 +112,20 @@
           <div class="presets-grid">
             <button type="button" class="preset-card" onclick="insertTextPreset('HOOK BANNER: CHỈ TỪ 1.100Đ', '#FFE600')">
               <div class="p-preview" style="color: #FFE600; font-family: 'Montserrat', sans-serif;">CHỈ TỪ 1.100Đ</div>
-              <div class="p-name">Hook Banner Vàng Neon</button></div>
+              <div class="p-name">Hook Banner Vàng Neon</div>
+            </button>
             <button type="button" class="preset-card" onclick="insertTextPreset('Montserrat Shadow Commercial', '#FFFFFF')">
               <div class="p-preview montserrat-shadow">Montserrat Shadow</div>
-              <div class="p-name">Commercial Standard (KB16)</button></div>
+              <div class="p-name">Commercial Standard (KB16)</div>
+            </button>
             <button type="button" class="preset-card" onclick="insertTextPreset('GIẢM GIÁ 50% HÔM NAY', '#FF3B30')">
               <div class="p-preview" style="color: #FF3B30; font-weight:800;">SALE 50% 🔥</div>
-              <div class="p-name">Flash Sale / FOMO</button></div>
+              <div class="p-name">Flash Sale / FOMO</div>
+            </button>
             <button type="button" class="preset-card" onclick="insertTextPreset('Hotline / Zalo: 09xx.xxx.xxx', '#00E5FF')">
               <div class="p-preview" style="color: #00E5FF; font-size: 11px;">Hotline / Zalo: 09xx...</div>
-              <div class="p-name">Footer Call To Action</button></div>
+              <div class="p-name">Footer Call To Action</div>
+            </button>
           </div>
         </div>
 

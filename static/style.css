@@ -93,8 +93,11 @@
 
 html, body {
   width: 100%;
+  height: 100vh;
   height: 100dvh;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
   background-color: var(--bg-app);
   color: var(--text-main);
   font-family: var(--font-sans);
@@ -102,6 +105,11 @@ html, body {
   line-height: 1.4;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Tôn trọng người dùng giảm hiệu ứng chuyển động */
@@ -278,7 +286,8 @@ input:focus, select:focus, textarea:focus {
    2. UPPER WORKSPACE (BỐ CỤC 3 CỘT: THƯ VIỆN - PREVIEW - INSPECTOR)
    ========================================================================== */
 .upper-workspace {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   display: flex;
   flex-direction: row;
   overflow: hidden;
@@ -1257,9 +1266,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 .lower-timeline {
-  height: 38vh;
-  min-height: 180px;
-  max-height: 70vh;
+  flex: 0 0 35vh;
+  height: 35vh;
+  min-height: 160px;
+  max-height: 60vh;
   background-color: var(--bg-app);
   display: flex;
   flex-direction: column;
@@ -1408,16 +1418,28 @@ input:focus, select:focus, textarea:focus {
   width: 100%;
 }
 
-.ruler-tick {
+.ruler-mark {
   position: absolute;
-  top: 4px;
+  top: 3px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-disabled);
+  color: var(--text-muted);
   transform: translateX(-50%);
   border-left: 1px solid var(--border-medium);
-  padding-left: 3px;
-  height: 14px;
+  padding-left: 4px;
+  height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ruler-mark-sub {
+  position: absolute;
+  top: 12px;
+  width: 1px;
+  height: 6px;
+  background-color: var(--border-subtle);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 /* Lane marker lỗi 6px nằm ở hàng dưới ruler, không bao giờ che số */

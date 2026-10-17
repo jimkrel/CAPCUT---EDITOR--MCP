@@ -34,6 +34,18 @@ function esc(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Helper: Ẩn thông tin thư mục người dùng cá nhân
+function maskUserPath(p) {
+  if (!p) return '--';
+  let str = String(p).replace(/\\/g, '/');
+  str = str.replace(/^[a-zA-Z]:\/Users\/[^/]+/i, '~');
+  const parts = str.split('/');
+  if (parts.length > 3) {
+    return '.../' + parts.slice(-3).join('/');
+  }
+  return str;
+}
+
 // Helper: Hệ thống Toast notification góc dưới phải
 function getToastContainer() {
   let c = document.getElementById('toastContainer');
@@ -336,7 +348,11 @@ async function loadProject(projectName, preserveView = false) {
     const durFormatted = formatTimecode(projectData.duration_us || 0);
     
     const detName = document.getElementById('detName'); if (detName) detName.textContent = projectData.project_name || '';
-    const detPath = document.getElementById('detPath'); if (detPath) detPath.textContent = projectData.path || '';
+    const detPath = document.getElementById('detPath');
+    if (detPath) {
+      detPath.textContent = maskUserPath(projectData.path);
+      detPath.title = 'Bấm để sao chép đường dẫn dự án';
+    }
     const detDuration = document.getElementById('detDuration'); if (detDuration) detDuration.textContent = `${durFormatted} (${durSec.toFixed(2)}s)`;
     const detFps = document.getElementById('detFps'); if (detFps) detFps.textContent = `${projectData.fps || 30} fps · ${projectData.color_space || 'Rec. 709'}`;
     const detTracks = document.getElementById('detTracks'); if (detTracks) detTracks.textContent = `${(projectData.tracks || []).length} tracks`;
