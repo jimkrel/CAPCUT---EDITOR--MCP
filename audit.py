@@ -11,6 +11,16 @@ from draft_io import (
     resolve_draft_path
 )
 
+def get_montserrat_font_path() -> str:
+    env_font = os.environ.get("MONTSERRAT_FONT_PATH")
+    if env_font and Path(env_font).exists():
+        return str(Path(env_font)).replace('\\', '/')
+    user_font = Path.home() / "AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+    if user_font.exists():
+        return str(user_font).replace('\\', '/')
+    return "Montserrat-Regular.otf"
+
+
 def quality_audit_core(project_name: str) -> Dict[str, Any]:
     """Kiểm tra chất lượng tổng quát dự án CapCut (Safe zone, độ dài phụ đề, outro chết)."""
     draft_file = get_draft_file(project_name)
@@ -364,7 +374,7 @@ def auto_fix_step_core(project_name: str, error_id: str) -> Dict[str, Any]:
                     break
     elif err_id.startswith("style_"):
         seg_id = err_id.replace("style_", "")
-        font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+        font_path = get_montserrat_font_path()
         target_mid = None
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
@@ -440,7 +450,7 @@ def auto_fix_all_core(project_name: str) -> Dict[str, Any]:
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
-    font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+    font_path = get_montserrat_font_path()
     actions_log = []
     
     # 1. Fix all text safe zones to y = -0.404 and inject Montserrat Shadow

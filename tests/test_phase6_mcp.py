@@ -1,6 +1,5 @@
 import json
 import pytest
-from pathlib import Path
 from unittest.mock import patch
 
 import mcp_server
@@ -93,27 +92,28 @@ def test_mcp_audit_project(mock_draft_env):
 def test_mcp_auto_fix_and_split_clip(mock_draft_env):
     draft_base, proj_name = mock_draft_env
     
-    # 1. Test auto-fix
-    fix_res_str = mcp_server.auto_fix(proj_name)
-    fix_res = json.loads(fix_res_str)
-    assert fix_res.get("status") == "success"
-    
-    # Kiểm tra sau khi auto-fix, toạ độ y đã về -0.404
-    draft_file = draft_base / proj_name / "draft_content.json"
-    with open(draft_file, "r", encoding="utf-8") as f:
-        d = json.load(f)
-    text_seg = d["tracks"][1]["segments"][0]
-    assert text_seg["clip"]["transform"]["y"] == -0.404
-    
-    # 2. Test split_clip
-    split_res_str = mcp_server.split_clip(proj_name, "seg_v1", 2000000)
-    split_res = json.loads(split_res_str)
-    assert split_res.get("status") == "success"
-    
-    # Kiểm tra track video đã có 2 segment
-    with open(draft_file, "r", encoding="utf-8") as f:
-        d2 = json.load(f)
-    assert len(d2["tracks"][0]["segments"]) == 2
+    with patch("mcp_server.is_capcut_running", return_value=False), patch("draft_io.is_capcut_running", return_value=False):
+        # 1. Test auto-fix
+        fix_res_str = mcp_server.auto_fix(proj_name)
+        fix_res = json.loads(fix_res_str)
+        assert fix_res.get("status") == "success"
+        
+        # Kiểm tra sau khi auto-fix, toạ độ y đã về -0.404
+        draft_file = draft_base / proj_name / "draft_content.json"
+        with open(draft_file, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        text_seg = d["tracks"][1]["segments"][0]
+        assert text_seg["clip"]["transform"]["y"] == -0.404
+        
+        # 2. Test split_clip
+        split_res_str = mcp_server.split_clip(proj_name, "seg_v1", 2000000)
+        split_res = json.loads(split_res_str)
+        assert split_res.get("status") == "success"
+        
+        # Kiểm tra track video đã có 2 segment
+        with open(draft_file, "r", encoding="utf-8") as f:
+            d2 = json.load(f)
+        assert len(d2["tracks"][0]["segments"]) == 2
 
 def test_mcp_capcut_running_blocks_modifications(mock_draft_env):
     draft_base, proj_name = mock_draft_env

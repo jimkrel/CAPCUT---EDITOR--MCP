@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from server import app
 
@@ -33,18 +32,21 @@ def test_1_2_cors_origin_post_validation():
     )
     assert resp_good.status_code != 403
 
-def test_1_3_media_endpoint_path_and_extension_restriction():
+def test_1_3_media_endpoint_path_and_extension_restriction(tmp_path):
     """/api/media chỉ cho phép file media hợp lệ trong thư mục dự án"""
     # Đuôi file bị cấm -> 403
-    resp_exe = client.get("/api/media?path=C:/Windows/notepad.exe")
+    bad_ext_file = tmp_path / "notepad.exe"
+    resp_exe = client.get(f"/api/media?path={bad_ext_file.resolve()}")
     assert resp_exe.status_code == 403
 
-    # File nhạy cảm ngoài thư mục draft -> 403
-    resp_hosts = client.get("/api/media?path=C:/Windows/System32/drivers/etc/hosts")
+    # File không thuộc đuôi media cho phép -> 403
+    bad_txt_file = tmp_path / "hosts.txt"
+    resp_hosts = client.get(f"/api/media?path={bad_txt_file.resolve()}")
     assert resp_hosts.status_code == 403
 
-    # File không tồn tại nhưng đuôi mp4 trong thư mục lạ -> 403
-    resp_fake = client.get("/api/media?path=C:/fake_unknown_dir/video.mp4")
+    # File không tồn tại nhưng đuôi mp4 trong thư mục lạ ngoài draft -> 403
+    outside_mp4 = tmp_path / "fake_unknown_dir" / "video.mp4"
+    resp_fake = client.get(f"/api/media?path={outside_mp4.resolve()}")
     assert resp_fake.status_code == 403
 
 def test_1_4_project_name_path_traversal():

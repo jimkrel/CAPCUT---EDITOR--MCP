@@ -61,7 +61,7 @@
 | Tên Biến | Mặc Định | Mô Tả |
 | :--- | :--- | :--- |
 | `CAPCUT_DRAFTS_DIR` | Tự động dò tìm | Đường dẫn thư mục chứa các dự án CapCut PC / JianYing Pro. Nếu không đặt, hệ thống tự động dò tìm trong `%LOCALAPPDATA%/CapCut` hoặc `Movies/CapCut`. |
-| `CAPCUT_MCP_JS` | `C:/Users/jinnr/...` | *(Tuỳ chọn)* Đường dẫn file script Node.js legacy nếu chạy qua cầu nối Node wrapper. |
+| `CAPCUT_MCP_JS` | `/path/to/legacy_mcp_server.js` | *(Tuỳ chọn)* Đường dẫn file script Node.js legacy nếu chạy qua cầu nối Node wrapper. |
 
 ---
 
@@ -88,7 +88,7 @@ Mở trình duyệt tại: `http://127.0.0.1:8765`
 
 #### Cách 1: Sử dụng lệnh `claude mcp add`
 ```bash
-claude mcp add capcut-web-studio python C:/path/to/capcut-web-studio/mcp_server.py
+claude mcp add capcut-web-studio python /path/to/capcut-web-studio/mcp_server.py
 ```
 
 #### Cách 2: Thêm vào file cấu hình `claude_desktop_config.json`
@@ -98,7 +98,7 @@ claude mcp add capcut-web-studio python C:/path/to/capcut-web-studio/mcp_server.
     "capcut-web-studio": {
       "command": "python",
       "args": [
-        "C:/Users/jinnr/.gemini/antigravity-ide/scratch/capcut-web-studio/mcp_server.py"
+        "/path/to/capcut-web-studio/mcp_server.py"
       ]
     }
   }

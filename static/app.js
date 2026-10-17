@@ -102,9 +102,13 @@ async function checkCapCutStatus() {
   try {
     const res = await fetch('/api/capcut-status');
     const data = await res.json();
+    const isRunning = Boolean(data.capcut_running || data.running || data.is_running);
     const banner = document.getElementById('capcutStatusBanner');
     if (banner) {
-      banner.style.display = data.is_running ? 'flex' : 'none';
+      banner.style.display = isRunning ? 'flex' : 'none';
+    }
+    if (isRunning) {
+      showToast('CapCut đang mở — chỉnh sửa bị khóa', 'warn');
     }
   } catch (e) {
     console.debug('Failed to check capcut status:', e);
@@ -224,10 +228,11 @@ function copyTextToClipboard(text) {
   }
 }
 
-// Nút Xuất dự án
-function exportDraft() {
-  showToast(`Dự án "${currentProject || 'Hiện tại'}" đã được lưu an toàn trong thư mục CapCut Desktop. Bạn có thể mở CapCut để render video.`, 'success', null, null, 6000);
+// Nút Lưu dự án
+function saveDraftAction() {
+  showToast(`Dự án "${currentProject || 'Hiện tại'}" đã được đồng bộ trực tiếp vào draft CapCut. Bạn có thể mở CapCut để xem kết quả.`, 'success', null, null, 4000);
 }
+const exportDraft = saveDraftAction;
 
 // 1. Fetch available projects
 async function fetchProjects() {
@@ -396,7 +401,7 @@ function renderComponentList(typeFilter = 'all', query = '') {
   container.innerHTML = '';
   
   if (!projectData || !projectData.components || projectData.components.length === 0) {
-    container.innerHTML = '<div style="color:#666;font-size:11px;padding:12px;text-align:center;">Không có thành phần nào trong dự án.</div>';
+    container.innerHTML = '<div style="color: var(--text-muted);font-size:11px;padding:12px;text-align:center;">Không có thành phần nào trong dự án.</div>';
     return;
   }
   
@@ -416,7 +421,7 @@ function renderComponentList(typeFilter = 'all', query = '') {
   });
   
   if (filtered.length === 0) {
-    container.innerHTML = `<div style="color:#666;font-size:11px;padding:12px;text-align:center;">Không tìm thấy thành phần nào phù hợp.</div>`;
+    container.innerHTML = `<div style="color: var(--text-muted);font-size:11px;padding:12px;text-align:center;">Không tìm thấy thành phần nào phù hợp.</div>`;
     return;
   }
   
@@ -445,7 +450,7 @@ function renderComponentList(typeFilter = 'all', query = '') {
     item.innerHTML = `
       <div class="comp-item-header">
         <span class="comp-item-type type-badge-${c.type}">${icon} ${c.type}</span>
-        <span class="comp-item-title" title="${c.label}">${c.label}</span>
+        <span class="comp-item-title" title="${esc(c.label)}">${esc(c.label)}</span>
       </div>
       <div class="comp-item-meta">
         <span class="comp-item-time">⏱ ${startSec}s ➔ ${endSec}s (${durSec}s)</span>
@@ -642,7 +647,7 @@ function renderTracks() {
       topBar.className = 'clip-top-bar';
       const iconMap = { video: '🎬', audio: '🎵', text: '🔤', effect: '✨', sticker: '🏷️' };
       const icon = iconMap[track.type] || '📦';
-      topBar.innerHTML = `<span style="font-size:10px;">${icon}</span><span class="clip-title-text" title="${seg.label}">${seg.label}</span>`;
+      topBar.innerHTML = `<span style="font-size:10px;">${icon}</span><span class="clip-title-text" title="${esc(seg.label)}">${esc(seg.label)}</span>`;
       clip.appendChild(topBar);
       
       // Bottom bar (Dur, Speed, Effects)
@@ -1414,10 +1419,36 @@ async function splitSelectedAtPlayhead(targetId) {
         playhead_time_us: currentPlayheadUs
       })
     });
+    if (res.status === 409) {
+      showToast('CapCut đang mở — chỉnh sửa bị khóa', 'error');
+      const banner = document.getElementById('capcutStatusBanner');
+      if (banner) banner.style.display = 'flex';
+      return;
+    }
     const data = await res.json();
     if (res.ok && data.status === 'success') {
       showToast(data.message || 'Đã cắt clip thành công', 'success');
+      const scrollEl = document.getElementById('timelineScroll');
+      const savedScrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
+      const targetSegId = segId;
       await loadProject(currentProject, true);
+      if (scrollEl) {
+        scrollEl.scrollLeft = savedScrollLeft;
+        requestAnimationFrame(() => { scrollEl.scrollLeft = savedScrollLeft; });
+      }
+      // Giữ selection cho segment vừa cắt
+      if (projectData && projectData.tracks) {
+        let foundSeg = null;
+        let foundTIdx = 0;
+        for (let tIdx = 0; tIdx < projectData.tracks.length; tIdx++) {
+          const s = (projectData.tracks[tIdx].segments || []).find(seg => seg.id === targetSegId || seg.id === data.new_segment_id);
+          if (s) { foundSeg = s; foundTIdx = tIdx; break; }
+        }
+        if (foundSeg) {
+          const clipEl = document.querySelector(`.timeline-clip[data-seg-id="${foundSeg.id}"]`);
+          selectClip(foundSeg, foundTIdx, clipEl);
+        }
+      }
     } else {
       showToast(data.message || data.detail || 'Không thể cắt clip', 'error');
     }
@@ -1448,11 +1479,23 @@ async function deleteSelected() {
         target_segment_id: segId
       })
     });
+    if (res.status === 409) {
+      showToast('CapCut đang mở — chỉnh sửa bị khóa', 'error');
+      const banner = document.getElementById('capcutStatusBanner');
+      if (banner) banner.style.display = 'flex';
+      return;
+    }
     const data = await res.json();
     if (res.ok && data.status === 'success') {
+      const scrollEl = document.getElementById('timelineScroll');
+      const savedScrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
       selectedSegment = null;
       switchDetailTab('project');
       await loadProject(currentProject, true);
+      if (scrollEl) {
+        scrollEl.scrollLeft = savedScrollLeft;
+        requestAnimationFrame(() => { scrollEl.scrollLeft = savedScrollLeft; });
+      }
       // Hiển thị toast kèm nút Hoàn tác trong 6 giây theo mục 4.5
       showToast(`Đã xóa "${clipLabel}"`, 'info', 'Hoàn tác', undoAction, 6000);
     } else {
@@ -1543,6 +1586,7 @@ async function duplicateSelected() {
 async function openQAModal() {
   const modal = document.getElementById('qaModal');
   modal.classList.add('open');
+  trapModalFocus(modal);
   
   try {
     const res = await fetch(`/api/quality-audit/${currentProject}`);
@@ -1567,23 +1611,25 @@ async function openQAModal() {
         item.className = 'qa-issue-item';
         item.innerHTML = `
           <div class="qa-issue-header">
-            <span class="issue-type">${iss.type}</span>
-            <span class="issue-badge">${iss.severity}</span>
+            <span class="issue-type">${esc(iss.type)}</span>
+            <span class="issue-badge">${esc(iss.severity)}</span>
           </div>
-          <div class="issue-msg">${iss.message}</div>
-          <div class="issue-action">Đề xuất: ${iss.fix_action}</div>
+          <div class="issue-msg">${esc(iss.message)}</div>
+          <div class="issue-action">Đề xuất: ${esc(iss.fix_action)}</div>
         `;
         list.appendChild(item);
       });
     }
   } catch (err) {
     console.error('Audit failed:', err);
+    showToast(`Lỗi kiểm định chất lượng: ${err.message || 'Không thể kết nối máy chủ'}`, 'error');
   }
 }
 
 function closeQAModal(e) {
   // Allow calling from overlay click OR directly
   document.getElementById('qaModal').classList.remove('open');
+  releaseModalFocus();
 }
 
 async function autoFixAllQuality() {
@@ -1649,7 +1695,7 @@ function renderMediaTab() {
               : `<img src="${streamUrl}" style="width:100%;height:70px;object-fit:cover;" onerror="this.style.display='none'" />`
             }
           </div>
-          <div class="media-name" title="${s.label}">${s.label}</div>
+          <div class="media-name" title="${esc(s.label)}">${esc(s.label)}</div>
         `;
         card.onclick = () => {
           updatePlayheadPosition(s.start_us);
@@ -1661,13 +1707,15 @@ function renderMediaTab() {
   });
   
   if (mediaFound === 0) {
-    grid.innerHTML = '<div style="color: #666; font-size: 11px; grid-column: span 2; padding: 12px; text-align: center;">Chưa có video nội bộ trong project này. Dự án gồm Text và Sticker.</div>';
+    grid.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; grid-column: span 2; padding: 12px; text-align: center;">Chưa có video nội bộ trong project này. Dự án gồm Text và Sticker.</div>';
   }
 }
 
 // 12. AI Modal & Execution
 function openAIPanel() {
-  document.getElementById('aiModal').classList.add('open');
+  const modal = document.getElementById('aiModal');
+  modal.classList.add('open');
+  trapModalFocus(modal);
   const segName = selectedSegment ? selectedSegment.label : 'Toàn bộ Timeline';
   const segTime = selectedSegment ? `${(selectedSegment.start_us/1e6).toFixed(2)}s ➔ ${(selectedSegment.end_us/1e6).toFixed(2)}s` : '00:00 - Hết';
   const trackName = selectedSegment ? `Track ${selectedSegment.trackIndex} (${selectedSegment.type})` : 'Tất cả các Track';
@@ -1680,6 +1728,7 @@ function openAIPanel() {
 
 function closeAIPanel() {
   document.getElementById('aiModal').classList.remove('open');
+  releaseModalFocus();
 }
 
 function applyQuickPrompt(text) {
@@ -1763,20 +1812,61 @@ function formatTimecode(us) {
   return `${hours}:${minutes}:${seconds}:${frames}`;
 }
 
+// Quản lý Modal Focus Trap (WCAG A11y)
+let prevActiveElementBeforeModal = null;
+
+function trapModalFocus(modalEl) {
+  if (!modalEl) return;
+  prevActiveElementBeforeModal = document.activeElement;
+  const focusables = modalEl.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+  if (focusables.length > 0) {
+    setTimeout(() => focusables[0].focus(), 50);
+  }
+}
+
+function releaseModalFocus() {
+  if (prevActiveElementBeforeModal && typeof prevActiveElementBeforeModal.focus === 'function') {
+    prevActiveElementBeforeModal.focus();
+    prevActiveElementBeforeModal = null;
+  }
+}
+
 function closeAllModals() {
-  const modals = document.querySelectorAll('.qa-modal-overlay, .ai-modal-overlay, .mcp-modal-overlay');
+  const modals = document.querySelectorAll('.qa-modal-overlay, .ai-modal-overlay, .mcp-modal-overlay, .agent-cockpit-overlay');
   modals.forEach(m => m.classList.remove('open', 'active'));
+  releaseModalFocus();
 }
 
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     const target = e.target;
     const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
-    const hasModalOpen = document.querySelector('.qa-modal-overlay.open, .ai-modal-overlay.open, .mcp-modal-overlay.open');
+    const activeModal = document.querySelector('.qa-modal-overlay.open, .ai-modal-overlay.open, .mcp-modal-overlay.open, .mcp-modal-overlay.active, .agent-cockpit-overlay.open');
     
+    // Xử lý Focus Trap bằng phím Tab khi modal đang mở
+    if (activeModal && e.key === 'Tab') {
+      const focusables = Array.from(activeModal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusables.length > 0) {
+        const firstEl = focusables[0];
+        const lastEl = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl || !activeModal.contains(document.activeElement)) {
+            e.preventDefault();
+            lastEl.focus();
+          }
+        } else {
+          if (document.activeElement === lastEl || !activeModal.contains(document.activeElement)) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+        return;
+      }
+    }
+
     // Nếu modal đang mở hoặc đang gõ input: Esc đóng modal / blur input
     if (e.key === 'Escape') {
-      if (hasModalOpen) {
+      if (activeModal) {
         e.preventDefault();
         closeAllModals();
         return;
@@ -1795,7 +1885,7 @@ function setupKeyboardShortcuts() {
     }
     
     // Bỏ qua tất cả các phím tắt khác khi đang gõ vào input/textarea/select hoặc khi modal mở
-    if (isInput || hasModalOpen) return;
+    if (isInput || activeModal) return;
     
     // Space: Phát / Dừng
     if (e.code === 'Space') {
@@ -1945,7 +2035,7 @@ async function scanCurrentProjectErrors() {
   } catch (err) {
     console.error('Scan footage errors failed:', err);
     if (container) {
-      container.innerHTML = `<div style="color:#ef4444;font-size:11px;padding:12px;text-align:center;">Lỗi quét footage: ${err.message}</div>`;
+      container.innerHTML = `<div style="color:#ef4444;font-size:11px;padding:12px;text-align:center;">Lỗi quét footage: ${esc(err.message)}</div>`;
     }
   }
 }
@@ -2001,29 +2091,64 @@ function renderErrorList(category = 'all') {
     const totalInGroup = grp.items.length;
     const unfixedItems = grp.items.filter(i => !i.isFixed);
     const unfixedCount = unfixedItems.length;
-    const sevClass = grp.severity.toLowerCase();
+    const sevClass = (grp.severity || 'info').toLowerCase();
 
     card.innerHTML = `
-      <div class="err-group-header" onclick="this.parentElement.querySelector('.err-group-items').style.display = this.parentElement.querySelector('.err-group-items').style.display === 'none' ? 'flex' : 'none'">
+      <div class="err-group-header">
         <div class="err-group-left">
-          <span class="severity-dot ${sevClass}" title="${grp.severity}"></span>
+          <span class="severity-dot ${sevClass}" title="${esc(grp.severity)}"></span>
           <div>
             <div class="err-group-title">${esc(grp.title)}</div>
             <div class="err-group-count">${totalInGroup} vị trí · ${unfixedCount > 0 ? `Cần sửa ${unfixedCount}` : '✓ Đã sửa xong'}</div>
           </div>
         </div>
-        ${unfixedCount > 0 ? `<button class="btn-fix-all-group" type="button" onclick="event.stopPropagation(); fixEntireErrorGroup('${esc(grp.title)}')">⚡ Sửa tất cả (${totalInGroup})</button>` : `<span style="color:var(--color-success);font-size:11px;font-weight:600;">✓ Đã tối ưu</span>`}
+        ${unfixedCount > 0 ? `<button class="btn-fix-all-group" type="button">⚡ Sửa tất cả (${totalInGroup})</button>` : `<span style="color:var(--color-success);font-size:11px;font-weight:600;">✓ Đã tối ưu</span>`}
       </div>
       <div class="err-group-items" style="display: flex;">
         ${grp.items.map(item => `
-          <div class="err-single-row" onclick="seekAndHighlightError('${item.id}', ${item.target_time_us || item.start_us}, '${item.segment_id || ''}')">
+          <div class="err-single-row" data-err-id="${esc(item.id)}" data-time="${item.target_time_us || item.start_us}" data-seg-id="${esc(item.segment_id || '')}">
             <span class="err-row-time">${formatTimecode(item.start_us)}</span>
             <span class="err-row-desc" title="${esc(item.description)}">${esc(item.description)}</span>
-            ${!item.isFixed ? `<button class="btn-fix-single" type="button" onclick="event.stopPropagation(); executeSingleAutoFix('${item.id}')">Sửa</button>` : `<span style="color:var(--color-success);font-size:10px;">✓</span>`}
+            ${!item.isFixed ? `<button class="btn-fix-single" type="button" data-fix-id="${esc(item.id)}">Sửa</button>` : `<span style="color:var(--color-success);font-size:10px;">✓</span>`}
           </div>
         `).join('')}
       </div>
     `;
+
+    // Toggle accordion
+    const headerEl = card.querySelector('.err-group-header');
+    const itemsEl = card.querySelector('.err-group-items');
+    headerEl.addEventListener('click', () => {
+      itemsEl.style.display = itemsEl.style.display === 'none' ? 'flex' : 'none';
+    });
+
+    // Button fix all group
+    const fixAllBtn = card.querySelector('.btn-fix-all-group');
+    if (fixAllBtn) {
+      fixAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fixEntireErrorGroup(grp.title);
+      });
+    }
+
+    // Single item clicks
+    card.querySelectorAll('.err-single-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const eid = row.getAttribute('data-err-id');
+        const t = parseInt(row.getAttribute('data-time'), 10) || 0;
+        const sid = row.getAttribute('data-seg-id') || '';
+        seekAndHighlightError(eid, t, sid);
+      });
+    });
+
+    // Button fix single item
+    card.querySelectorAll('.btn-fix-single').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fixId = btn.getAttribute('data-fix-id');
+        if (fixId) executeSingleAutoFix(fixId);
+      });
+    });
 
     container.appendChild(card);
   });
@@ -2089,7 +2214,7 @@ function renderActiveBoundingBoxes(timeUs) {
     boxEl.style.height = `${b.height}%`;
     
     boxEl.innerHTML = `
-      <div class="error-bbox-tag">${err.title.slice(0, 28)}</div>
+      <div class="error-bbox-tag">${esc(err.title.slice(0, 28))}</div>
     `;
     
     boxEl.onclick = (e) => {
@@ -2217,6 +2342,7 @@ function toggleLiveAgentModal() {
     closeLiveAgentModal();
   } else {
     modal.classList.add('open');
+    trapModalFocus(modal);
     scanCurrentProjectErrors();
   }
 }
@@ -2224,6 +2350,7 @@ function toggleLiveAgentModal() {
 function closeLiveAgentModal() {
   document.getElementById('liveAgentModal').classList.remove('open');
   pauseAgent();
+  releaseModalFocus();
 }
 
 function startLiveAIAgentEdit() {
@@ -2445,6 +2572,26 @@ function openMcpModal() {
   if (modal) {
     modal.classList.add('active');
     modal.classList.add('open');
+    trapModalFocus(modal);
+    
+    // Tự động điền đường dẫn từ project hiện tại nếu có
+    const projInput = document.getElementById('mcpProjectName');
+    const brollInput = document.getElementById('mcpBrollFolder');
+    const supInput = document.getElementById('mcpSupportingFolder');
+    
+    if (projInput && !projInput.value) {
+      projInput.value = currentProject || (projectData && projectData.project_name) || '';
+    }
+    if (projectData && projectData.path) {
+      const projDir = String(projectData.path).replace(/[\\\/]draft_content\.json$/i, '').replace(/\\/g, '/');
+      if (brollInput && !brollInput.value && projDir) {
+        brollInput.value = `${projDir}/materials/video`;
+      }
+      if (supInput && !supInput.value && projDir) {
+        supInput.value = `${projDir}/materials`;
+      }
+    }
+
     if (!document.getElementById('mcpScriptJson').value) {
       loadMcpPreset('cup');
     }
@@ -2459,6 +2606,7 @@ function closeMcpModal(event) {
   if (modal) {
     modal.classList.remove('active');
     modal.classList.remove('open');
+    releaseModalFocus();
   }
 }
 
@@ -2482,7 +2630,7 @@ function loadMcpPreset(type) {
   const ctaInput = document.getElementById('mcpDirectorCta');
   
   if (type === 'cup') {
-    if (projInput) projInput.value = 'BBSM_LY_GIAY_ECO_PRO';
+    if (projInput && !projInput.value) projInput.value = currentProject || 'DU_AN_LY_GIAY';
     if (hookInput) hookInput.value = 'CẢNH BÁO: ĐỪNG DÙNG LY NHỰA NỮA!';
     if (ctaInput) ctaInput.value = 'BẤM VÀO GIỎ HÀNG NHẬN CHIẾT KHẤU 20%';
     if (rawTextarea) {
@@ -2492,7 +2640,7 @@ function loadMcpPreset(type) {
 4. Nhấp vào giỏ hàng ngay hôm nay để nhận ưu đãi chiết khấu 20% cho 50 đơn đầu tiên! (broll: uu_dai)`;
     }
   } else if (type === 'coffee') {
-    if (projInput) projInput.value = 'BBSM_CA_PHE_ROBUSTA_PRO';
+    if (projInput && !projInput.value) projInput.value = currentProject || 'DU_AN_CA_PHE';
     if (hookInput) hookInput.value = 'BÍ QUYẾT ĐẬM ĐÀ CỦA CÀ PHÊ MỘC!';
     if (ctaInput) ctaInput.value = 'MUA NGAY HÔM NAY TẶNG KÈM PHIN NHÔM';
     if (rawTextarea) {
@@ -2501,7 +2649,7 @@ function loadMcpPreset(type) {
 3. Thưởng thức một ly cà phê chuẩn vị mỗi sớm mai, bừng tỉnh năng lượng và khởi đầu ngày mới tuyệt vời! (broll: thuong_thuc)`;
     }
   } else if (type === 'retail') {
-    if (projInput) projInput.value = 'BBSM_SALE_BLACK_FRIDAY';
+    if (projInput && !projInput.value) projInput.value = currentProject || 'DU_AN_SIEU_SALE';
     if (hookInput) hookInput.value = 'SIÊU SALE DUY NHẤT 24 GIỜ!';
     if (ctaInput) ctaInput.value = 'NHANH TAY CHỐT ĐƠN KẺO HẾT VOUCHER';
     if (rawTextarea) {
@@ -2583,11 +2731,11 @@ async function runFootageAnalysisFromInput() {
       renderDiagnosticResults(data);
     } else {
       logMcpTerminal(`[AI-FOOTAGE] Lỗi phân tích: ${data.message || 'Không quét được folder'}`);
-      if (container) container.innerHTML = `<div class="mcp-empty-diag" style="color:#ef4444;">${data.message || 'Lỗi quét folder'}</div>`;
+      if (container) container.innerHTML = `<div class="mcp-empty-diag" style="color:#ef4444;">${esc(data.message || 'Lỗi quét folder')}</div>`;
     }
   } catch (err) {
     logMcpTerminal(`[AI-FOOTAGE] Lỗi kết nối: ${err.message}`);
-    if (container) container.innerHTML = `<div class="mcp-empty-diag" style="color:#ef4444;">Lỗi kết nối: ${err.message}</div>`;
+    if (container) container.innerHTML = `<div class="mcp-empty-diag" style="color:#ef4444;">Lỗi kết nối: ${esc(err.message)}</div>`;
   }
 }
 
@@ -2610,7 +2758,7 @@ function renderDiagnosticResults(data) {
   // 2. Proposal Box
   const propBody = document.getElementById('mcpAiProposalText');
   if (propBody && proposals && proposals.length > 0) {
-    propBody.innerHTML = proposals.map(p => `<div>• ${p}</div>`).join('');
+    propBody.innerHTML = proposals.map(p => `<div>• ${esc(p)}</div>`).join('');
   }
   
   // 3. Render Cards
@@ -2622,7 +2770,7 @@ function renderDiagnosticResults(data) {
   
   files.forEach(f => {
     const card = document.createElement('div');
-    const statusClass = f.status.toLowerCase();
+    const statusClass = (f.status || 'acceptable').toLowerCase();
     card.className = `mcp-footage-card card-${statusClass}`;
     
     // Auto-exclude rejected clips
@@ -2646,8 +2794,8 @@ function renderDiagnosticResults(data) {
       <div class="card-left">
         <div class="card-icon">${f.status === 'REJECTED' ? '🚫' : (f.status === 'WARNING' ? '⚠️' : '🎬')}</div>
         <div class="card-name-col">
-          <div class="card-fname" title="${f.file_name}">${f.file_name}</div>
-          <div class="card-meta">${f.duration_sec}s · ${f.resolution} · ${f.diagnosis}</div>
+          <div class="card-fname" title="${esc(f.file_name)}">${esc(f.file_name)}</div>
+          <div class="card-meta">${Number(f.duration_sec) || 0}s · ${esc(f.resolution)} · ${esc(f.diagnosis)}</div>
         </div>
       </div>
 
@@ -2655,20 +2803,20 @@ function renderDiagnosticResults(data) {
         <div class="metric-col" title="Tỷ lệ pixel trắng cháy sáng (ngưỡng 22%)">
           <div class="metric-header">
             <span>Cháy Sáng:</span>
-            <span>${f.overexposed_pct}%</span>
+            <span>${Number(f.overexposed_pct) || 0}%</span>
           </div>
           <div class="metric-bar-bg">
-            <div class="metric-bar-fill ${expClass}" style="width: ${Math.min(100, f.overexposed_pct * 3)}%"></div>
+            <div class="metric-bar-fill ${expClass}" style="width: ${Math.min(100, (Number(f.overexposed_pct) || 0) * 3)}%"></div>
           </div>
         </div>
 
         <div class="metric-col" title="Độ dao động camera rung lắc (ngưỡng 24.0)">
           <div class="metric-header">
             <span>Rung Lắc:</span>
-            <span>${f.shake_score}</span>
+            <span>${Number(f.shake_score) || 0}</span>
           </div>
           <div class="metric-bar-bg">
-            <div class="metric-bar-fill ${shakeClass}" style="width: ${Math.min(100, f.shake_score * 3)}%"></div>
+            <div class="metric-bar-fill ${shakeClass}" style="width: ${Math.min(100, (Number(f.shake_score) || 0) * 3)}%"></div>
           </div>
         </div>
       </div>
@@ -2676,11 +2824,18 @@ function renderDiagnosticResults(data) {
       <div class="card-actions">
         ${badgeMap[f.status] || badgeMap.ACCEPTABLE}
         <label class="mcp-check-item" title="Đánh dấu để cho phép bốc vào timeline hoặc loại trừ">
-          <input type="checkbox" ${isApproved ? 'checked' : ''} onchange="toggleFootageApproval('${f.file_path.replace(/\\/g, '/')}', this.checked)">
+          <input type="checkbox" class="footage-approval-chk" ${isApproved ? 'checked' : ''}>
           <span>Duyệt</span>
         </label>
       </div>
     `;
+
+    const chk = card.querySelector('.footage-approval-chk');
+    if (chk) {
+      chk.addEventListener('change', (e) => {
+        toggleFootageApproval(f.file_path.replace(/\\/g, '/'), e.target.checked);
+      });
+    }
     
     container.appendChild(card);
   });

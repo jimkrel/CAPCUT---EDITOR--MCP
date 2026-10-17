@@ -26,6 +26,16 @@ def resolve_draft_path(raw_path: str, draft_dir: Path) -> str:
         return resolved
     return raw_path
 
+def get_montserrat_font_path() -> str:
+    env_font = os.environ.get("MONTSERRAT_FONT_PATH")
+    if env_font and Path(env_font).exists():
+        return str(Path(env_font)).replace('\\', '/')
+    user_font = Path.home() / "AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+    if user_font.exists():
+        return str(user_font).replace('\\', '/')
+    return "Montserrat-Regular.otf"
+
+
 def detect_capcut_draft_base() -> Path:
     """Tự động dò tìm thư mục dự án CapCut / JianYing trên Windows và macOS."""
     env_dir = os.environ.get("CAPCUT_DRAFTS_DIR")
@@ -265,14 +275,7 @@ def is_allowed_media_file(p: Path) -> bool:
     except ValueError:
         pass
         
-    # 2. Nằm trong thư mục web studio hiện tại
-    try:
-        resolved.relative_to(Path(__file__).parent.resolve())
-        return True
-    except ValueError:
-        pass
-        
-    # 3. Nằm trong thư mục materials / footage được tham chiếu trong các dự án
+    # 2. Nằm trong thư mục materials / footage được tham chiếu trong các dự án
     if CAPCUT_DRAFT_BASE.exists():
         for d in CAPCUT_DRAFT_BASE.iterdir():
             if d.is_dir():
@@ -337,7 +340,9 @@ def get_capcut_status():
     running = is_capcut_running()
     return {
         "running": running,
-        "message": "CapCut Desktop đang chạy. Thao tác ghi sẽ bị khóa." if running else "CapCut Desktop chưa chạy. Sẵn sàng ghi an toàn."
+        "capcut_running": running,
+        "is_running": running,
+        "message": "CapCut Desktop đang chạy — chỉnh sửa bị khóa." if running else "CapCut Desktop chưa chạy. Sẵn sàng ghi an toàn."
     }
 
 @app.get("/api/projects")
@@ -1277,7 +1282,7 @@ def auto_fix_step(req: AutoFixStepRequest):
                     break
     elif err_id.startswith("style_"):
         seg_id = err_id.replace("style_", "")
-        font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+        font_path = get_montserrat_font_path()
         target_mid = None
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
@@ -1353,7 +1358,7 @@ def auto_fix_all(req: AutoFixAllRequest):
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
-    font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+    font_path = get_montserrat_font_path()
     actions_log = []
     
     # 1. Fix all text safe zones to y = -0.404 and inject Montserrat Shadow
@@ -1510,7 +1515,7 @@ def execute_command(req: CommandRequest):
         elif 'đỏ' in cmd_lower: color_rgb = [1.0, 0.2, 0.2]
         elif 'xanh' in cmd_lower: color_rgb = [0.0, 0.9, 1.0]
         
-        font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
+        font_path = get_montserrat_font_path()
         updated_texts = 0
         for t in (data.get("materials") or {}).get("texts", []):
             c_obj = json.loads(t.get("content", "{}"))

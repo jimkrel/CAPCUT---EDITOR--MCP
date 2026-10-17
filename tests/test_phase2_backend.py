@@ -1,11 +1,9 @@
 import pytest
 import json
-import shutil
-from pathlib import Path
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
-from server import app, CAPCUT_DRAFT_BASE
+from server import app
 
 client = TestClient(app)
 

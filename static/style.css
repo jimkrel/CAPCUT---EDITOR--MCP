@@ -351,7 +351,7 @@ input:focus, select:focus, textarea:focus {
 .tab-err-badge {
   background-color: var(--color-error);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: var(--radius-full);
@@ -598,7 +598,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: var(--radius-xs);
   background-color: var(--bg-surface);
   border: 1px solid var(--border-medium);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-main);
 }
 
@@ -714,7 +714,7 @@ input:focus, select:focus, textarea:focus {
 .error-bbox-tag {
   background-color: var(--color-error);
   color: #fff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   padding: 1px 4px;
   border-radius: 2px;
@@ -741,7 +741,7 @@ input:focus, select:focus, textarea:focus {
   transform: translateX(-50%);
   background-color: rgba(0, 0, 0, 0.65);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }
@@ -1066,7 +1066,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .insp-type-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
@@ -1120,14 +1120,14 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-copy-mini {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--accent-hover);
   padding: 1px 5px;
 }
 
 .path-display-box {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   padding: 6px;
@@ -1321,7 +1321,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .tool-hotkey {
-  font-size: 9px;
+  font-size: 11px;
   background-color: var(--bg-panel-secondary);
   padding: 1px 3px;
   border-radius: 2px;
@@ -1379,7 +1379,7 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-sm);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--text-disabled);
@@ -1412,7 +1412,7 @@ input:focus, select:focus, textarea:focus {
   position: absolute;
   top: 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-disabled);
   transform: translateX(-50%);
   border-left: 1px solid var(--border-medium);
@@ -1514,7 +1514,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-track-ctl {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-disabled);
   padding: 1px 3px;
 }
@@ -1573,7 +1573,7 @@ input:focus, select:focus, textarea:focus {
 
 .clip-error-icon {
   margin-right: 4px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* ==========================================================================
