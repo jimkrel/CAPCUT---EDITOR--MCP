@@ -2,13 +2,18 @@ import os
 import json
 import shutil
 import re
+import time
+import logging
+import uuid
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Request, Query
+from fastapi import FastAPI, HTTPException, Request, Response, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 def resolve_draft_path(raw_path: str, draft_dir: Path) -> str:
     """Resolve CapCut ##_draftpath_placeholder_UUID_## to the actual draft folder path."""
@@ -21,35 +26,277 @@ def resolve_draft_path(raw_path: str, draft_dir: Path) -> str:
         return resolved
     return raw_path
 
+def detect_capcut_draft_base() -> Path:
+    """Tự động dò tìm thư mục dự án CapCut / JianYing trên Windows và macOS."""
+    env_dir = os.environ.get("CAPCUT_DRAFTS_DIR")
+    if env_dir and Path(env_dir).exists():
+        return Path(env_dir).resolve()
+        
+    localappdata = os.environ.get("LOCALAPPDATA", "")
+    home = Path.home()
+    
+    candidates = [
+        # CapCut PC Windows
+        Path(localappdata) / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft" if localappdata else None,
+        # JianYing Pro Windows
+        Path(localappdata) / "JianyingPro" / "User Data" / "Projects" / "com.lveditor.draft" if localappdata else None,
+        # CapCut macOS
+        home / "Movies" / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft",
+        # JianYing macOS
+        home / "Movies" / "JianyingPro" / "User Data" / "Projects" / "com.lveditor.draft",
+    ]
+    for c in candidates:
+        if c and c.exists():
+            return c.resolve()
+            
+    default_p = Path(localappdata) / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft" if localappdata else home / "CapCutDrafts"
+    return default_p.resolve()
+
+def is_capcut_running() -> bool:
+    """Kiểm tra xem CapCut Desktop hoặc JianYing có đang chạy bằng psutil không."""
+    target_procs = {"capcut.exe", "jianyingpro.exe", "capcut"}
+    try:
+        import psutil
+        for p in psutil.process_iter(['name']):
+            p_name = (p.info.get('name') or '').lower()
+            if p_name in target_procs:
+                return True
+    except Exception as e:
+        logging.warning(f"Lỗi kiểm tra psutil: {e}")
+    return False
+
+def check_capcut_not_running():
+    """Chặn ghi khi CapCut đang chạy để tránh xung đột file draft."""
+    if is_capcut_running():
+        raise HTTPException(
+            status_code=409,
+            detail="CapCut Desktop đang chạy! Vui lòng đóng CapCut trước khi ghi hoặc chỉnh sửa dự án để tránh xung đột dữ liệu."
+        )
+
 def save_draft_safely_py(draft_file: Path, data: dict):
-    """Write draft atomically using a temporary file and create a .bak backup."""
+    """Ghi draft an toàn bằng file tạm và tạo file backup .bak."""
     backup_file = draft_file.with_suffix(".json.bak")
     temp_file = draft_file.with_suffix(".json.tmp")
     if draft_file.exists():
         try:
             shutil.copy2(draft_file, backup_file)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Không thể tạo backup .bak: {e}")
     with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(temp_file, draft_file)
 
+def save_draft_with_history(draft_file: Path, data: dict):
+    """Ghi draft và lưu tối đa 20 snapshot vào thư mục .history/ để hỗ trợ Undo/Redo nhiều bước."""
+    draft_dir = draft_file.parent
+    history_dir = draft_dir / ".history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    
+    index_file = history_dir / "history_state.json"
+    state = {"snapshots": [], "current_index": -1}
+    if index_file.exists():
+        try:
+            with open(index_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            pass
+            
+    curr_idx = state.get("current_index", -1)
+    snapshots = state.get("snapshots", [])
+    
+    # Nếu history chưa có snapshot nào nhưng draft đã tồn tại, lưu snapshot ban đầu làm mốc hoàn tác gốc
+    if len(snapshots) == 0 and draft_file.exists():
+        try:
+            with open(draft_file, "r", encoding="utf-8") as f:
+                init_data = json.load(f)
+            init_name = f"draft_init_{int(time.time() * 1000)}.json"
+            init_path = history_dir / init_name
+            with open(init_path, "w", encoding="utf-8") as f:
+                json.dump(init_data, f, ensure_ascii=False, indent=2)
+            snapshots.append(init_name)
+            curr_idx = 0
+        except Exception as e:
+            logging.warning(f"Không thể lưu snapshot gốc: {e}")
+            
+    timestamp = int(time.time() * 1000)
+    snap_name = f"draft_{timestamp}.json"
+    snap_path = history_dir / snap_name
+    with open(snap_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        
+    if 0 <= curr_idx < len(snapshots) - 1:
+        for s in snapshots[curr_idx + 1:]:
+            p = history_dir / s
+            if p.exists():
+                try: p.unlink()
+                except Exception: pass
+        snapshots = snapshots[:curr_idx + 1]
+        
+    snapshots.append(snap_name)
+    if len(snapshots) > 20:
+        oldest = snapshots.pop(0)
+        p = history_dir / oldest
+        if p.exists():
+            try: p.unlink()
+            except Exception: pass
+            
+    state["snapshots"] = snapshots
+    state["current_index"] = len(snapshots) - 1
+    with open(index_file, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False)
+        
+    save_draft_safely_py(draft_file, data)
+
+def clean_orphan_materials(data: dict):
+    """Dọn dẹp các material mồ côi không còn được segment nào tham chiếu."""
+    used_ids = set()
+    for track in data.get("tracks", []):
+        for s in track.get("segments", []):
+            if s.get("material_id"):
+                used_ids.add(s["material_id"])
+            for ref in s.get("extra_material_refs", []):
+                used_ids.add(ref)
+                
+    mats = data.get("materials", {})
+    material_keys = ["videos", "audios", "texts", "video_effects", "material_animations", "transitions", "stickers", "speeds"]
+    for k in material_keys:
+        if k in mats and isinstance(mats[k], list):
+            mats[k] = [item for item in mats[k] if item.get("id") in used_ids]
+
+def recalculate_project_duration(data: dict):
+    """Tính toán lại tổng thời lượng duration của draft dựa trên toàn bộ segments."""
+    max_end = 0
+    for track in data.get("tracks", []):
+        for s in track.get("segments", []):
+            tr = s.get("target_timerange") or {}
+            end = tr.get("start", 0) + tr.get("duration", 0)
+            if end > max_end:
+                max_end = end
+    data["duration"] = max_end
+
 app = FastAPI(title="CapCut AI Co-Director Studio")
+
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8765",
+    "http://localhost:8765",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def validate_origin_middleware(request: Request, call_next):
+    # Kiểm tra Origin cho các request ghi dữ liệu (POST, PUT, DELETE, PATCH)
+    if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+        origin = request.headers.get("origin")
+        if origin and origin not in ALLOWED_ORIGINS:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Forbidden: Origin không nằm trong danh sách được phép"}
+            )
+    return await call_next(request)
+
 @app.exception_handler(ConnectionResetError)
 async def connection_reset_handler(request: Request, exc: ConnectionResetError):
-    # Chromium canceled media range request during seek - harmless client disconnect
-    return JSONResponse(status_code=204, content={"detail": "Client closed connection"})
+    # Chromium canceled media range request during seek - harmless client disconnect (HTTP 204 No Content không có body)
+    return Response(status_code=204)
 
-CAPCUT_DRAFT_BASE = Path(os.environ.get("LOCALAPPDATA", "")) / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
+CAPCUT_DRAFT_BASE = detect_capcut_draft_base()
+PROJECT_NAME_REGEX = re.compile(r"^[\w\- .]+$")
+ALLOWED_MEDIA_EXTS = {".mp4", ".mov", ".mp3", ".m4a", ".wav", ".jpg", ".jpeg", ".png", ".webp"}
+
+def get_draft_file(project_name: str, must_exist: bool = True) -> Path:
+    """Validate project_name và resolve đường dẫn draft_content.json, ngăn chặn Path Traversal."""
+    if not project_name or not PROJECT_NAME_REGEX.match(project_name):
+        raise HTTPException(status_code=400, detail="Tên dự án chứa ký tự không hợp lệ")
+    
+    base_resolved = CAPCUT_DRAFT_BASE.resolve()
+    draft_file = (CAPCUT_DRAFT_BASE / project_name / "draft_content.json").resolve()
+    
+    # Bắt buộc draft_file phải nằm trong CAPCUT_DRAFT_BASE
+    try:
+        draft_file.relative_to(base_resolved)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Truy cập ngoài thư mục dự án CapCut bị từ chối")
+        
+    if must_exist and not draft_file.exists():
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy dự án CapCut: {project_name}")
+        
+    return draft_file
+
+def validate_folder_path(folder_path: str) -> Path:
+    """Validate thư mục footage an toàn, chống duyệt thư mục hệ thống."""
+    if not folder_path or not folder_path.strip():
+        raise HTTPException(status_code=400, detail="Đường dẫn thư mục không được để trống")
+    p = Path(folder_path.strip()).resolve()
+    if not p.exists() or not p.is_dir():
+        raise HTTPException(status_code=400, detail=f"Thư mục không tồn tại: {folder_path}")
+        
+    # Chặn các thư mục hệ thống nguy hiểm trên Windows/Linux
+    forbidden_roots = ["C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "/etc", "/var", "/bin", "/usr"]
+    for fb in forbidden_roots:
+        try:
+            p.relative_to(Path(fb).resolve())
+            raise HTTPException(status_code=403, detail="Truy cập thư mục hệ thống bị từ chối vì lý do an toàn")
+        except ValueError:
+            pass
+    return p
+
+def is_allowed_media_file(p: Path) -> bool:
+    """Chỉ cho phép đọc media thuộc thư mục draft hoặc materials được tham chiếu."""
+    try:
+        resolved = p.resolve()
+    except Exception:
+        return False
+        
+    ext = resolved.suffix.lower()
+    if ext not in ALLOWED_MEDIA_EXTS:
+        return False
+        
+    # 1. Nằm trong CAPCUT_DRAFT_BASE
+    try:
+        resolved.relative_to(CAPCUT_DRAFT_BASE.resolve())
+        return True
+    except ValueError:
+        pass
+        
+    # 2. Nằm trong thư mục web studio hiện tại
+    try:
+        resolved.relative_to(Path(__file__).parent.resolve())
+        return True
+    except ValueError:
+        pass
+        
+    # 3. Nằm trong thư mục materials / footage được tham chiếu trong các dự án
+    if CAPCUT_DRAFT_BASE.exists():
+        for d in CAPCUT_DRAFT_BASE.iterdir():
+            if d.is_dir():
+                df = d / "draft_content.json"
+                if df.exists():
+                    try:
+                        with open(df, "r", encoding="utf-8") as f:
+                            d_json = json.load(f)
+                            mats = d_json.get("materials", {})
+                            for item in mats.get("videos", []) + mats.get("audios", []):
+                                raw_p = item.get("path") or item.get("media_path")
+                                if raw_p:
+                                    res_p = Path(resolve_draft_path(raw_p, d)).resolve()
+                                    if resolved == res_p:
+                                        return True
+                                    if res_p.parent and res_p.parent.exists():
+                                        try:
+                                            resolved.relative_to(res_p.parent)
+                                            return True
+                                        except ValueError:
+                                            pass
+                    except Exception:
+                        continue
+    return False
 
 class CommandRequest(BaseModel):
     project_name: str
@@ -84,10 +331,22 @@ class AutoFixStepRequest(BaseModel):
 class AutoFixAllRequest(BaseModel):
     project_name: str
 
+@app.get("/api/capcut-status")
+def get_capcut_status():
+    """Kiểm tra trạng thái thực thi của phần mềm CapCut Desktop."""
+    running = is_capcut_running()
+    return {
+        "running": running,
+        "message": "CapCut Desktop đang chạy. Thao tác ghi sẽ bị khóa." if running else "CapCut Desktop chưa chạy. Sẵn sàng ghi an toàn."
+    }
+
 @app.get("/api/projects")
 def list_projects():
     if not CAPCUT_DRAFT_BASE.exists():
-        return {"projects": []}
+        return {
+            "projects": [],
+            "warning": f"Không tìm thấy thư mục CapCut tại: {CAPCUT_DRAFT_BASE}. Vui lòng kiểm tra cài đặt hoặc đặt biến môi trường CAPCUT_DRAFTS_DIR."
+        }
     
     projects = []
     for item in CAPCUT_DRAFT_BASE.iterdir():
@@ -97,16 +356,20 @@ def list_projects():
             video_count = 0
             text_count = 0
             duration_us = 0
+            err_msg = None
             try:
-                # Fast sample read for header info
                 with open(draft_file, "r", encoding="utf-8") as f:
                     meta = json.load(f)
-                    video_count = len(meta.get("materials", {}).get("videos", []))
-                    text_count = len(meta.get("materials", {}).get("texts", []))
+                    mats = meta.get("materials") or {}
+                    video_count = len(mats.get("videos") or [])
+                    text_count = len(mats.get("texts") or [])
                     duration_us = meta.get("duration", 0)
-            except Exception:
-                pass
-            projects.append({
+            except json.JSONDecodeError:
+                err_msg = "Không parse được JSON, có thể draft bị mã hóa hoặc hỏng"
+            except Exception as e:
+                err_msg = f"Lỗi đọc draft: {str(e)}"
+                
+            entry = {
                 "name": item.name,
                 "path": str(draft_file).replace("\\", "/"),
                 "modified": mtime,
@@ -114,19 +377,32 @@ def list_projects():
                 "text_count": text_count,
                 "duration_sec": round(duration_us / 1e6, 2),
                 "has_footage": video_count > 0
-            })
+            }
+            if err_msg:
+                entry["error"] = err_msg
+            projects.append(entry)
             
-    # Sort: projects with footage first, then newest
+    # Sắp xếp: dự án có footage lên đầu, sau đó theo thời gian chỉnh sửa mới nhất
     projects.sort(key=lambda x: (1 if x["has_footage"] else 0, x["modified"]), reverse=True)
-    return {"projects": projects}
+    return {"projects": projects, "capcut_running": is_capcut_running()}
 
 @app.get("/api/media")
 def stream_media(path: str = Query(..., description="Absolute path to media file")):
     p = Path(path)
-    if not p.exists() or not p.is_file():
-        raise HTTPException(status_code=404, detail="Media file not found")
-    
     ext = p.suffix.lower()
+    
+    # 1. Whitelist extension check
+    if ext not in ALLOWED_MEDIA_EXTS:
+        raise HTTPException(status_code=403, detail="Định dạng tệp media không được phép truy cập")
+        
+    resolved_p = p.resolve()
+    # 2. Whitelist directory check (draft folder, materials folder)
+    if not is_allowed_media_file(resolved_p):
+        raise HTTPException(status_code=403, detail="Truy cập tệp nằm ngoài thư mục dự án CapCut bị từ chối")
+        
+    if not resolved_p.exists() or not resolved_p.is_file():
+        raise HTTPException(status_code=404, detail="Không tìm thấy tệp media")
+    
     media_types = {
         ".mp4": "video/mp4",
         ".mov": "video/quicktime",
@@ -138,14 +414,11 @@ def stream_media(path: str = Query(..., description="Absolute path to media file
         ".png": "image/png",
         ".webp": "image/webp"
     }
-    return FileResponse(p, media_type=media_types.get(ext, "application/octet-stream"))
+    return FileResponse(resolved_p, media_type=media_types.get(ext, "application/octet-stream"))
 
 @app.get("/api/project/{project_name}")
 def get_project(project_name: str):
-    draft_file = CAPCUT_DRAFT_BASE / project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project draft_content.json not found")
-    
+    draft_file = get_draft_file(project_name)
     draft_dir = draft_file.parent
     
     try:
@@ -187,7 +460,6 @@ def get_project(project_name: str):
         resolved = resolve_draft_path(raw_path, draft_dir)
         audios_map[aid] = {**a, "_resolved_path": resolved}
         
-    transitions_map = {tr.get("id"): tr for tr in materials.get("transitions", [])}
     effects_map = {e.get("id"): e for e in materials.get("video_effects", [])}
     mat_animations_map = {m.get("id"): m for m in materials.get("material_animations", [])}
     
@@ -207,12 +479,13 @@ def get_project(project_name: str):
                 end_us = start_us + dur_us
                 if end_us > max_track_end: max_track_end = end_us
                 
-                clip_meta = s.get("clip", {})
-                scale_val = clip_meta.get("scale", {}).get("x", 1.0)
-                transform = clip_meta.get("transform", {})
+                clip_meta = s.get("clip") or {}
+                scale_meta = clip_meta.get("scale") or {}
+                scale_val = scale_meta.get("x", 1.0)
+                transform = clip_meta.get("transform") or {}
                 
                 # Collect extra_material_refs (effects, animations, transitions applied)
-                extra_refs = s.get("extra_material_refs", [])
+                extra_refs = s.get("extra_material_refs") or []
                 applied_effects = []
                 applied_animations = []
                 for ref_id in extra_refs:
@@ -221,15 +494,15 @@ def get_project(project_name: str):
                         applied_effects.append({
                             "id": ref_id,
                             "name": e.get("name", e.get("effect_id", ref_id[:8])),
-                            "params": e.get("effect_adjust_params", [])
+                            "params": e.get("effect_adjust_params") or []
                         })
                     if ref_id in mat_animations_map:
                         a = mat_animations_map[ref_id]
                         applied_animations.append({
                             "id": ref_id,
-                            "in": a.get("in", {}).get("name", ""),
-                            "out": a.get("out", {}).get("name", ""),
-                            "loop": a.get("loop", {}).get("name", "")
+                            "in": (a.get("in") or {}).get("name", ""),
+                            "out": (a.get("out") or {}).get("name", ""),
+                            "loop": (a.get("loop") or {}).get("name", "")
                         })
                 
                 seg_info = {
@@ -254,24 +527,24 @@ def get_project(project_name: str):
                 }
                 
                 if track_type == "text":
-                    txt_obj = texts_map.get(mid, {})
-                    raw_t = txt_obj.get("raw", {})
+                    txt_obj = texts_map.get(mid) or {}
+                    raw_t = txt_obj.get("raw") or {}
                     seg_info["label"] = txt_obj.get("text", "Text") or "Text"
                     seg_info["color"] = "#a84334"
                     seg_info["details"]["text"] = txt_obj.get("text", "")
-                    seg_info["details"]["styles"] = txt_obj.get("styles", [])
+                    seg_info["details"]["styles"] = txt_obj.get("styles") or []
                     seg_info["details"]["font_size"] = raw_t.get("font_size", 0)
                     seg_info["details"]["text_align"] = raw_t.get("alignment", 1)
                 elif track_type == "sticker":
-                    st_obj = stickers_map.get(mid, {})
+                    st_obj = stickers_map.get(mid) or {}
                     seg_info["label"] = st_obj.get("name", "Sticker") or "Ảnh vector"
                     seg_info["color"] = "#cf8a28"
                     seg_info["details"]["sticker_id"] = st_obj.get("id", "")
                     seg_info["details"]["sticker_url"] = st_obj.get("resource_id", "")
                 elif track_type == "video":
-                    v_obj = videos_map.get(mid, {})
+                    v_obj = videos_map.get(mid) or {}
                     resolved = v_obj.get("_resolved_path", "")
-                    filename = os.path.basename(resolved) if resolved else "Video Clip"
+                    filename = os.path.basename(resolved) if resolved else ""
                     mat_name = v_obj.get("material_name", "") or v_obj.get("category_name", "")
                     seg_info["label"] = filename or mat_name or "Video Clip"
                     seg_info["color"] = "#2d6cdf"
@@ -282,27 +555,47 @@ def get_project(project_name: str):
                     seg_info["details"]["duration_us"] = v_obj.get("duration", 0)
                     seg_info["details"]["has_audio"] = v_obj.get("has_audio", False)
                 elif track_type == "audio":
-                    a_obj = audios_map.get(mid, {})
+                    a_obj = audios_map.get(mid) or {}
                     resolved = a_obj.get("_resolved_path", "")
-                    filename = os.path.basename(resolved) if resolved else "Audio"
-                    seg_info["label"] = filename or a_obj.get("name", "Audio")
+                    filename = os.path.basename(resolved) if resolved else ""
+                    seg_info["label"] = filename or a_obj.get("name") or a_obj.get("material_name") or "Audio"
                     seg_info["color"] = "#258352"
                     seg_info["media_path"] = resolved
                     seg_info["details"]["path"] = resolved
                     seg_info["details"]["volume"] = s.get("volume", 1.0)
+                elif track_type in ("effect", "adjust"):
+                    seg_info["label"] = "Hiệu ứng"
+                    seg_info["color"] = "#b030b0"
                     
                 parsed_segments.append(seg_info)
             except Exception as seg_err:
-                # Never crash on a single bad segment — skip it gracefully
+                # Ghi log lỗi và gán nhãn fallback theo track type, tính đúng end_us, không nhét lỗi vào label
+                logging.warning(f"Lỗi parse segment {s.get('id')}: {seg_err}")
+                tr_fallback = s.get("target_timerange") or {}
+                f_start = tr_fallback.get("start", 0)
+                f_dur = tr_fallback.get("duration", 0)
+                f_end = f_start + f_dur
+                if f_end > max_track_end:
+                    max_track_end = f_end
+                type_labels = {
+                    "video": "Video Clip",
+                    "audio": "Audio",
+                    "text": "Văn bản",
+                    "effect": "Hiệu ứng",
+                    "adjust": "Hiệu ứng",
+                    "sticker": "Nhãn dán"
+                }
+                fallback_label = type_labels.get(track_type, "Clip")
+                fallback_color = "#2d6cdf" if track_type == "video" else ("#258352" if track_type == "audio" else "#cf8a28")
                 parsed_segments.append({
                     "id": s.get("id", "?"),
                     "material_id": s.get("material_id", ""),
-                    "start_us": s.get("target_timerange", {}).get("start", 0),
-                    "duration_us": s.get("target_timerange", {}).get("duration", 0),
-                    "end_us": 0,
+                    "start_us": f_start,
+                    "duration_us": f_dur,
+                    "end_us": f_end,
                     "type": track_type,
-                    "label": f"[ERR] {str(seg_err)[:40]}",
-                    "color": "#6b3030",
+                    "label": fallback_label,
+                    "color": fallback_color,
                     "scale": 1.0, "transform_x": 0, "transform_y": 0,
                     "media_path": "", "effects": [], "animations": [],
                     "visible": True, "volume": 1.0, "speed": 1.0, "details": {}
@@ -380,11 +673,16 @@ def get_project(project_name: str):
                 "details": s.get("details", {})
             })
 
+    canvas_config = data.get("canvas_config") or {}
+    color_space = data.get("color_space") or canvas_config.get("color_space") or "Rec. 709"
+
     return {
         "project_name": project_name,
         "path": str(draft_file).replace("\\", "/"),
         "duration_us": calc_duration,
         "fps": fps,
+        "color_space": color_space,
+        "canvas_config": canvas_config,
         "tracks": parsed_tracks,
         "components": all_components,
         "raw_stats": {
@@ -400,36 +698,99 @@ def get_project(project_name: str):
 
 @app.post("/api/update-clip")
 def update_clip(req: UpdateClipRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-        
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
     target_mid = None
     target_seg = None
+    target_track = None
     for track in data.get("tracks", []):
         for s in track.get("segments", []):
             if s.get("id") == req.segment_id:
                 target_seg = s
                 target_mid = s.get("material_id")
-                if req.start_us is not None:
-                    s["target_timerange"]["start"] = max(0, req.start_us)
-                if req.duration_us is not None:
-                    s["target_timerange"]["duration"] = max(100_000, req.duration_us)
-                if req.scale is not None:
-                    s["clip"] = s.get("clip", {})
-                    s["clip"]["scale"] = {"x": req.scale, "y": req.scale}
-                if req.volume is not None:
-                    s["volume"] = max(0.0, min(2.0, req.volume))
-                if req.speed is not None:
-                    s["speed"] = max(0.1, min(10.0, req.speed))
+                target_track = track
                 break
-        if target_seg: break
+        if target_seg:
+            break
         
-    if not target_seg:
+    if not target_seg or not target_track:
         raise HTTPException(status_code=404, detail="Segment not found")
+        
+    cur_trange = target_seg.get("target_timerange") or {}
+    cur_start = cur_trange.get("start", 0)
+    cur_dur = cur_trange.get("duration", 0)
+    new_start = max(0, req.start_us) if req.start_us is not None else cur_start
+    new_dur = max(100_000, req.duration_us) if req.duration_us is not None else cur_dur
+    new_end = new_start + new_dur
+
+    # Kiểm tra va chạm / overlap với clip khác trong cùng track (Từ chối hoặc Snap)
+    for other in target_track.get("segments", []):
+        if other.get("id") == req.segment_id:
+            continue
+        o_tr = other.get("target_timerange") or {}
+        o_start = o_tr.get("start", 0)
+        o_dur = o_tr.get("duration", 0)
+        o_end = o_start + o_dur
+        if max(new_start, o_start) < min(new_end, o_end):
+            overlap_us = min(new_end, o_end) - max(new_start, o_start)
+            if overlap_us <= 500_000:
+                # Snap nếu va chạm nhỏ <= 0.5s
+                if new_start < o_start:
+                    new_dur = max(100_000, o_start - new_start)
+                    new_end = new_start + new_dur
+                else:
+                    new_start = o_end
+                    new_end = new_start + new_dur
+            else:
+                raise HTTPException(status_code=400, detail="Clip bị chồng chéo với clip khác trong cùng track")
+
+    # Cập nhật thời gian
+    if "target_timerange" not in target_seg:
+        target_seg["target_timerange"] = {}
+    target_seg["target_timerange"]["start"] = new_start
+    target_seg["target_timerange"]["duration"] = new_dur
+
+    # Cập nhật speed & source_timerange
+    speed_val = target_seg.get("speed", 1.0) or 1.0
+    if req.speed is not None:
+        speed_val = max(0.1, min(10.0, req.speed))
+        target_seg["speed"] = speed_val
+        # Cập nhật hoặc tạo speed trong materials.speeds
+        mats = data.setdefault("materials", {})
+        speeds_list = mats.setdefault("speeds", [])
+        speed_ref_id = None
+        for ref_id in (target_seg.get("extra_material_refs") or []):
+            for sp in speeds_list:
+                if sp.get("id") == ref_id:
+                    sp["speed"] = speed_val
+                    speed_ref_id = ref_id
+                    break
+            if speed_ref_id:
+                break
+        if not speed_ref_id:
+            speed_ref_id = str(uuid.uuid4()).upper()
+            speeds_list.append({
+                "id": speed_ref_id,
+                "speed": speed_val,
+                "type": "speed"
+            })
+            if "extra_material_refs" not in target_seg:
+                target_seg["extra_material_refs"] = []
+            target_seg["extra_material_refs"].append(speed_ref_id)
+
+    # Đổi duration thì cập nhật source_timerange theo speed
+    if target_seg.get("source_timerange"):
+        target_seg["source_timerange"]["duration"] = int(round(new_dur * speed_val))
+
+    # Cập nhật scale, volume, text
+    if req.scale is not None:
+        target_seg["clip"] = target_seg.get("clip") or {}
+        target_seg["clip"]["scale"] = {"x": req.scale, "y": req.scale}
+    if req.volume is not None:
+        target_seg["volume"] = max(0.0, min(2.0, req.volume))
         
     if req.text_content is not None and target_mid:
         for t in data.get("materials", {}).get("texts", []):
@@ -439,23 +800,26 @@ def update_clip(req: UpdateClipRequest):
                 t["content"] = json.dumps(c_obj, ensure_ascii=False)
                 break
                 
-    save_draft_safely_py(draft_file, data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
         
     return {"status": "success", "message": "Clip updated successfully"}
 
 @app.post("/api/split-clip")
 def split_clip(req: CommandRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
     split_us = req.playhead_time_us or 0
     found = False
-    import uuid
+    materials = data.setdefault("materials", {})
+    
     for track in data.get("tracks", []):
         for idx, s in enumerate(track.get("segments", [])):
             if s.get("id") == req.target_segment_id:
-                tr = s.get("target_timerange", {})
+                tr = s.get("target_timerange") or {}
                 start = tr.get("start", 0)
                 dur = tr.get("duration", 0)
                 end = start + dur
@@ -467,6 +831,8 @@ def split_clip(req: CommandRequest):
                     
                     new_seg = json.loads(json.dumps(s))
                     new_seg["id"] = str(uuid.uuid4()).upper()
+                    if "target_timerange" not in new_seg:
+                        new_seg["target_timerange"] = {}
                     new_seg["target_timerange"]["start"] = split_us
                     new_seg["target_timerange"]["duration"] = right_dur
                     
@@ -477,24 +843,65 @@ def split_clip(req: CommandRequest):
                         src_dur = s["source_timerange"].get("duration", 0)
                         left_src_dur = int(round(left_dur * speed))
                         s["source_timerange"]["duration"] = left_src_dur
+                        if "source_timerange" not in new_seg:
+                            new_seg["source_timerange"] = {}
                         new_seg["source_timerange"]["start"] = src_start + left_src_dur
                         new_seg["source_timerange"]["duration"] = max(100_000, src_dur - left_src_dur)
+                        
+                    # Clone material theo từng segment với id mới cho extra_material_refs
+                    new_extra_refs = []
+                    for ref_id in (s.get("extra_material_refs") or []):
+                        new_ref_id = str(uuid.uuid4()).upper()
+                        cloned = False
+                        for mat_cat in ["video_effects", "material_animations", "speeds", "transitions", "stickers"]:
+                            cat_list = materials.get(mat_cat) or []
+                            for mat_item in cat_list:
+                                if mat_item.get("id") == ref_id:
+                                    cloned_item = json.loads(json.dumps(mat_item))
+                                    cloned_item["id"] = new_ref_id
+                                    cat_list.append(cloned_item)
+                                    cloned = True
+                                    break
+                            if cloned:
+                                break
+                        new_extra_refs.append(new_ref_id if cloned else ref_id)
+                    new_seg["extra_material_refs"] = new_extra_refs
+                    
+                    # Chia lại keyframe theo thời gian cắt
+                    if s.get("keyframe_list"):
+                        old_kfs = s.get("keyframe_list") or []
+                        left_kfs = []
+                        right_kfs = []
+                        for kf in old_kfs:
+                            time_offset = kf.get("time_offset", 0)
+                            if time_offset <= left_dur:
+                                left_kfs.append(kf)
+                            else:
+                                new_kf = json.loads(json.dumps(kf))
+                                new_kf["id"] = str(uuid.uuid4()).upper()
+                                new_kf["time_offset"] = max(0, time_offset - left_dur)
+                                right_kfs.append(new_kf)
+                        s["keyframe_list"] = left_kfs
+                        new_seg["keyframe_list"] = right_kfs
                         
                     track["segments"].insert(idx + 1, new_seg)
                     found = True
                     break
-        if found: break
+        if found:
+            break
         
     if not found:
         return {"status": "error", "message": "Playhead must be inside the selected clip to split"}
         
-    save_draft_safely_py(draft_file, data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
         
     return {"status": "success", "message": f"Split clip successfully at {split_us/1e6:.2f}s"}
 
 @app.post("/api/delete-clip")
 def delete_clip(req: CommandRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
@@ -509,15 +916,15 @@ def delete_clip(req: CommandRequest):
     if not deleted:
         return {"status": "error", "message": "Clip not found to delete"}
         
-    save_draft_safely_py(draft_file, data)
+    clean_orphan_materials(data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
         
     return {"status": "success", "message": "Clip deleted successfully"}
 
 @app.get("/api/quality-audit/{project_name}")
 def quality_audit(project_name: str):
-    draft_file = CAPCUT_DRAFT_BASE / project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
+    draft_file = get_draft_file(project_name)
         
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -531,7 +938,9 @@ def quality_audit(project_name: str):
     for track in data.get("tracks", []):
         if track.get("type") == "text":
             for s in track.get("segments", []):
-                y = s.get("clip", {}).get("transform", {}).get("y", 0)
+                clip_m = s.get("clip") or {}
+                tf_m = clip_m.get("transform") or {}
+                y = tf_m.get("y", 0)
                 if y < -0.45:
                     unsafe_texts += 1
     if unsafe_texts > 0:
@@ -568,7 +977,8 @@ def quality_audit(project_name: str):
     for track in data.get("tracks", []):
         if track.get("type") in ["audio", "text"]:
             for s in track.get("segments", []):
-                end = s.get("target_timerange", {}).get("start", 0) + s.get("target_timerange", {}).get("duration", 0)
+                tr = s.get("target_timerange") or {}
+                end = tr.get("start", 0) + tr.get("duration", 0)
                 if end > max_voice: max_voice = end
                 
     if total_dur > max_voice + 1_500_000 and max_voice > 0:
@@ -590,39 +1000,35 @@ def quality_audit(project_name: str):
     }
 
 def scan_project_errors(project_name: str) -> Dict[str, Any]:
-    draft_file = CAPCUT_DRAFT_BASE / project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-        
+    draft_file = get_draft_file(project_name)
     draft_dir = draft_file.parent
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
         
     errors = []
-    texts_map = {t.get("id"): t for t in data.get("materials", {}).get("texts", [])}
-    videos_map = {v.get("id"): v for v in data.get("materials", {}).get("videos", [])}
+    texts_map = {t.get("id"): t for t in (data.get("materials") or {}).get("texts", [])}
+    videos_map = {v.get("id"): v for v in (data.get("materials") or {}).get("videos", [])}
     
     # 1. Scan tracks for timing, safe zone, aspect ratio & subtitle styles
     for t_idx, track in enumerate(data.get("tracks", [])):
         ttype = track.get("type")
         for seg in track.get("segments", []):
             sid = seg.get("id")
-            trange = seg.get("target_timerange", {})
+            trange = seg.get("target_timerange") or {}
             start_us = trange.get("start", 0)
             dur_us = trange.get("duration", 0)
             end_us = start_us + dur_us
             mid = seg.get("material_id")
             
             if ttype == "text":
-                clip_meta = seg.get("clip", {})
-                tf = clip_meta.get("transform", {})
+                clip_meta = seg.get("clip") or {}
+                tf = clip_meta.get("transform") or {}
                 y = tf.get("y", 0.0)
-                x = tf.get("x", 0.0)
-                t_obj = texts_map.get(mid, {})
+                t_obj = texts_map.get(mid) or {}
                 try:
                     c_obj = json.loads(t_obj.get("content", "{}"))
                     txt = c_obj.get("text", "")
-                    styles = c_obj.get("styles", [])
+                    styles = c_obj.get("styles") or []
                 except Exception:
                     txt, styles = "", []
                 
@@ -677,7 +1083,7 @@ def scan_project_errors(project_name: str) -> Dict[str, Any]:
                     })
                 
                 # Check Montserrat Shadow standard
-                has_shadow = any(len(s.get("shadows", [])) > 0 for s in styles) if styles else False
+                has_shadow = any(len(s.get("shadows") or []) > 0 for s in styles) if styles else False
                 if not has_shadow and txt:
                     top_pct = max(10.0, min(88.0, (1.0 - y) / 2.0 * 100.0 - 6.0))
                     errors.append({
@@ -731,9 +1137,10 @@ def scan_project_errors(project_name: str) -> Dict[str, Any]:
                     })
             
             elif ttype == "video":
-                clip_meta = seg.get("clip", {})
-                scale_x = clip_meta.get("scale", {}).get("x", 1.0)
-                v_obj = videos_map.get(mid, {})
+                clip_meta = seg.get("clip") or {}
+                scale_meta = clip_meta.get("scale") or {}
+                scale_x = scale_meta.get("x", 1.0)
+                v_obj = videos_map.get(mid) or {}
                 raw_path = v_obj.get("path", "") or v_obj.get("media_path", "")
                 resolved_p = resolve_draft_path(raw_path, draft_dir)
                 
@@ -793,7 +1200,8 @@ def scan_project_errors(project_name: str) -> Dict[str, Any]:
     for t in data.get("tracks", []):
         if t.get("type") in ["audio", "text"]:
             for s in t.get("segments", []):
-                e = s.get("target_timerange", {}).get("start", 0) + s.get("target_timerange", {}).get("duration", 0)
+                tr = s.get("target_timerange") or {}
+                e = tr.get("start", 0) + tr.get("duration", 0)
                 if e > max_voice: max_voice = e
                 
     if total_dur > max_voice + 1_200_000 and max_voice > 0:
@@ -847,12 +1255,8 @@ def get_footage_errors(project_name: str):
 
 @app.post("/api/ai-agent/auto-fix-step")
 def auto_fix_step(req: AutoFixStepRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    backup_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json.bak"
-    shutil.copy2(draft_file, backup_file)
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -866,8 +1270,8 @@ def auto_fix_step(req: AutoFixStepRequest):
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
                 if s.get("id") == seg_id:
-                    s["clip"] = s.get("clip", {})
-                    s["clip"]["transform"] = s["clip"].get("transform", {})
+                    s["clip"] = s.get("clip") or {}
+                    s["clip"]["transform"] = s["clip"].get("transform") or {}
                     s["clip"]["transform"]["y"] = target_y
                     action_note = f"✓ Đã dịch chuyển toạ độ phụ đề về y = {target_y} (Chuẩn an toàn TikTok)"
                     break
@@ -881,7 +1285,7 @@ def auto_fix_step(req: AutoFixStepRequest):
                     target_mid = s.get("material_id")
                     break
         if target_mid:
-            for t in data.get("materials", {}).get("texts", []):
+            for t in (data.get("materials") or {}).get("texts", []):
                 if t.get("id") == target_mid:
                     c_obj = json.loads(t.get("content", "{}"))
                     txt_str = c_obj.get("text", "")
@@ -909,7 +1313,7 @@ def auto_fix_step(req: AutoFixStepRequest):
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
                 if s.get("id") == seg_id:
-                    s["clip"] = s.get("clip", {})
+                    s["clip"] = s.get("clip") or {}
                     s["clip"]["scale"] = {"x": 1.15, "y": 1.15}
                     action_note = "✓ Đã áp dụng Punch-in Zoom (1.15x) loại bỏ hoàn toàn viền đen"
                     break
@@ -918,7 +1322,7 @@ def auto_fix_step(req: AutoFixStepRequest):
         for track in data.get("tracks", []):
             if track.get("type") in ["audio", "text"]:
                 for s in track.get("segments", []):
-                    tr = s.get("target_timerange", {})
+                    tr = s.get("target_timerange") or {}
                     end_time = tr.get("start", 0) + tr.get("duration", 0)
                     if end_time > max_voice_end:
                         max_voice_end = end_time
@@ -927,12 +1331,13 @@ def auto_fix_step(req: AutoFixStepRequest):
             data["duration"] = target_end
             for track in data.get("tracks", []):
                 for s in track.get("segments", []):
-                    tr = s.get("target_timerange", {})
+                    tr = s.get("target_timerange") or {}
                     if tr.get("start", 0) + tr.get("duration", 0) > target_end:
                         tr["duration"] = max(100_000, target_end - tr.get("start", 0))
             action_note = f"✓ Đã cắt cụt timeline tại {target_end/1e6:.2f}s, triệt tiêu khoảng chết"
             
-    save_draft_safely_py(draft_file, data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
         
     return {
         "status": "success",
@@ -942,12 +1347,8 @@ def auto_fix_step(req: AutoFixStepRequest):
 
 @app.post("/api/ai-agent/auto-fix-all")
 def auto_fix_all(req: AutoFixAllRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    backup_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json.bak"
-    shutil.copy2(draft_file, backup_file)
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -960,15 +1361,15 @@ def auto_fix_all(req: AutoFixAllRequest):
     for track in data.get("tracks", []):
         if track.get("type") == "text":
             for s in track.get("segments", []):
-                s["clip"] = s.get("clip", {})
-                s["clip"]["transform"] = s["clip"].get("transform", {})
+                s["clip"] = s.get("clip") or {}
+                s["clip"]["transform"] = s["clip"].get("transform") or {}
                 s["clip"]["transform"]["y"] = -0.404
                 fixed_texts += 1
                 
     if fixed_texts > 0:
         actions_log.append(f"✓ Đã căn chỉnh {fixed_texts} phụ đề về Safe Zone TikTok (y = -0.404)")
         
-    for t in data.get("materials", {}).get("texts", []):
+    for t in (data.get("materials") or {}).get("texts", []):
         try:
             c_obj = json.loads(t.get("content", "{}"))
             txt_str = c_obj.get("text", "")
@@ -998,8 +1399,8 @@ def auto_fix_all(req: AutoFixAllRequest):
     for track in data.get("tracks", []):
         if track.get("type") == "video":
             for s in track.get("segments", []):
-                s["clip"] = s.get("clip", {})
-                cur_scale = s["clip"].get("scale", {}).get("x", 1.0)
+                s["clip"] = s.get("clip") or {}
+                cur_scale = (s["clip"].get("scale") or {}).get("x", 1.0)
                 if cur_scale < 1.0:
                     s["clip"]["scale"] = {"x": 1.15, "y": 1.15}
                     fixed_scales += 1
@@ -1011,7 +1412,7 @@ def auto_fix_all(req: AutoFixAllRequest):
     for track in data.get("tracks", []):
         if track.get("type") in ["audio", "text"]:
             for s in track.get("segments", []):
-                tr = s.get("target_timerange", {})
+                tr = s.get("target_timerange") or {}
                 end_time = tr.get("start", 0) + tr.get("duration", 0)
                 if end_time > max_voice_end:
                     max_voice_end = end_time
@@ -1020,27 +1421,24 @@ def auto_fix_all(req: AutoFixAllRequest):
         data["duration"] = target_end
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
-                tr = s.get("target_timerange", {})
+                tr = s.get("target_timerange") or {}
                 if tr.get("start", 0) + tr.get("duration", 0) > target_end:
                     tr["duration"] = max(100_000, target_end - tr.get("start", 0))
         actions_log.append(f"✓ Đã triệt tiêu đuôi chết, chốt timeline dứt khoát tại {target_end/1e6:.2f}s")
 
-    save_draft_safely_py(draft_file, data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
 
     return {
         "status": "success",
         "actions_log": actions_log,
-        "message": f"AI Agent đã tự động sửa toàn bộ lỗi trên timeline!"
+        "message": "AI Agent đã tự động sửa toàn bộ lỗi trên timeline!"
     }
 
 @app.post("/api/execute-command")
 def execute_command(req: CommandRequest):
-    draft_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json"
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    backup_file = CAPCUT_DRAFT_BASE / req.project_name / "draft_content.json.bak"
-    shutil.copy2(draft_file, backup_file)
+    check_capcut_not_running()
+    draft_file = get_draft_file(req.project_name)
     
     with open(draft_file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -1061,8 +1459,10 @@ def execute_command(req: CommandRequest):
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
                 if s.get("id") == req.target_segment_id:
-                    curr_start = s.get("target_timerange", {}).get("start", 0)
+                    curr_start = (s.get("target_timerange") or {}).get("start", 0)
                     new_start = max(0, curr_start + delta)
+                    if "target_timerange" not in s:
+                        s["target_timerange"] = {}
                     s["target_timerange"]["start"] = new_start
                     found = True
                     direction_str = "sớm hơn" if is_earlier else "trễ hơn"
@@ -1073,7 +1473,9 @@ def execute_command(req: CommandRequest):
         if not found and req.target_track_index is not None:
             t = data.get("tracks", [])[req.target_track_index]
             for s in t.get("segments", []):
-                s["target_timerange"]["start"] = max(0, s["target_timerange"]["start"] + delta)
+                if "target_timerange" not in s:
+                    s["target_timerange"] = {}
+                s["target_timerange"]["start"] = max(0, (s["target_timerange"].get("start", 0)) + delta)
             feedback.append(f"✓ Đã dịch chuyển toàn bộ segment trên Track {req.target_track_index} {val}s")
 
     # 2. Change text
@@ -1092,7 +1494,7 @@ def execute_command(req: CommandRequest):
             if target_mid: break
             
         if target_mid:
-            for t in data.get("materials", {}).get("texts", []):
+            for t in (data.get("materials") or {}).get("texts", []):
                 if t.get("id") == target_mid:
                     c_obj = json.loads(t.get("content", "{}"))
                     old_text = c_obj.get("text", "")
@@ -1110,7 +1512,7 @@ def execute_command(req: CommandRequest):
         
         font_path = "C:/Users/jinnr/AppData/Local/Microsoft/Windows/Fonts/Montserrat-Regular.otf"
         updated_texts = 0
-        for t in data.get("materials", {}).get("texts", []):
+        for t in (data.get("materials") or {}).get("texts", []):
             c_obj = json.loads(t.get("content", "{}"))
             txt_str = c_obj.get("text", "")
             c_obj["styles"] = [{
@@ -1142,7 +1544,7 @@ def execute_command(req: CommandRequest):
         for track in data.get("tracks", []):
             for s in track.get("segments", []):
                 if s.get("id") == req.target_segment_id:
-                    s["clip"] = s.get("clip", {})
+                    s["clip"] = s.get("clip") or {}
                     s["clip"]["scale"] = {"x": scale_val, "y": scale_val}
                     feedback.append(f"✓ Đã áp dụng Punch-in Zoom ({scale_val}x) cho clip")
                     break
@@ -1152,8 +1554,8 @@ def execute_command(req: CommandRequest):
         for track in data.get("tracks", []):
             if track.get("type") == "text":
                 for s in track.get("segments", []):
-                    s["clip"] = s.get("clip", {})
-                    s["clip"]["transform"] = s["clip"].get("transform", {})
+                    s["clip"] = s.get("clip") or {}
+                    s["clip"]["transform"] = s["clip"].get("transform") or {}
                     s["clip"]["transform"]["y"] = -0.404
         feedback.append("✓ Đã căn chỉnh toàn bộ phụ đề về tọa độ an toàn TikTok (y = -0.404)")
 
@@ -1163,7 +1565,7 @@ def execute_command(req: CommandRequest):
         for track in data.get("tracks", []):
             if track.get("type") in ["audio", "text"]:
                 for s in track.get("segments", []):
-                    tr = s.get("target_timerange", {})
+                    tr = s.get("target_timerange") or {}
                     end_time = tr.get("start", 0) + tr.get("duration", 0)
                     if end_time > max_voice_end:
                         max_voice_end = end_time
@@ -1172,7 +1574,7 @@ def execute_command(req: CommandRequest):
             data["duration"] = target_end
             for track in data.get("tracks", []):
                 for s in track.get("segments", []):
-                    tr = s.get("target_timerange", {})
+                    tr = s.get("target_timerange") or {}
                     if tr.get("start", 0) + tr.get("duration", 0) > target_end:
                         tr["duration"] = max(100_000, target_end - tr.get("start", 0))
             feedback.append(f"✓ Đã triệt tiêu đuôi chết, chốt dứt khoát tại {target_end/1e6:.2f}s")
@@ -1180,24 +1582,88 @@ def execute_command(req: CommandRequest):
     if not feedback:
         feedback.append(f"✓ Đã thực thi lệnh '{cmd}' và cập nhật thông số dự án thành công!")
 
-    save_draft_safely_py(draft_file, data)
+    recalculate_project_duration(data)
+    save_draft_with_history(draft_file, data)
 
     return {
         "status": "success",
         "feedback": "\n".join(feedback),
-        "backup": str(backup_file).replace("\\", "/")
+        "message": "Thực thi thành công"
     }
 
 @app.post("/api/undo/{project_name}")
 def undo_action(project_name: str):
-    draft_file = CAPCUT_DRAFT_BASE / project_name / "draft_content.json"
-    backup_file = CAPCUT_DRAFT_BASE / project_name / "draft_content.json.bak"
+    check_capcut_not_running()
+    draft_file = get_draft_file(project_name)
+    history_dir = draft_file.parent / ".history"
+    index_file = history_dir / "history_state.json"
     
+    if history_dir.exists() and index_file.exists():
+        try:
+            with open(index_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            snapshots = state.get("snapshots", [])
+            curr_idx = state.get("current_index", -1)
+            if curr_idx > 0 and len(snapshots) > 0:
+                curr_idx -= 1
+                target_snap = history_dir / snapshots[curr_idx]
+                if target_snap.exists():
+                    with open(target_snap, "r", encoding="utf-8") as f:
+                        snap_data = json.load(f)
+                    save_draft_safely_py(draft_file, snap_data)
+                    state["current_index"] = curr_idx
+                    with open(index_file, "w", encoding="utf-8") as f:
+                        json.dump(state, f, ensure_ascii=False)
+                    return {
+                        "status": "success",
+                        "message": f"Hoàn tác thành công (Bước {curr_idx + 1}/{len(snapshots)})",
+                        "remaining_undo": curr_idx,
+                        "remaining_redo": len(snapshots) - 1 - curr_idx
+                    }
+        except Exception as e:
+            logging.warning(f"Lỗi đọc history undo: {e}")
+            
+    backup_file = draft_file.with_suffix(".json.bak")
     if not backup_file.exists():
-        return {"status": "error", "message": "No backup available to restore"}
+        return {"status": "error", "message": "Không có bản backup hoặc lịch sử để hoàn tác"}
     
     shutil.copy2(backup_file, draft_file)
-    return {"status": "success", "message": "Restored from last backup (before the previous command)"}
+    return {"status": "success", "message": "Đã khôi phục từ bản backup gần nhất"}
+
+@app.post("/api/redo/{project_name}")
+def redo_action(project_name: str):
+    check_capcut_not_running()
+    draft_file = get_draft_file(project_name)
+    history_dir = draft_file.parent / ".history"
+    index_file = history_dir / "history_state.json"
+    
+    if not history_dir.exists() or not index_file.exists():
+        return {"status": "error", "message": "Không có lịch sử để làm lại (Redo)"}
+        
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        snapshots = state.get("snapshots", [])
+        curr_idx = state.get("current_index", -1)
+        if curr_idx < len(snapshots) - 1 and curr_idx >= 0:
+            curr_idx += 1
+            target_snap = history_dir / snapshots[curr_idx]
+            if target_snap.exists():
+                with open(target_snap, "r", encoding="utf-8") as f:
+                    snap_data = json.load(f)
+                save_draft_safely_py(draft_file, snap_data)
+                state["current_index"] = curr_idx
+                with open(index_file, "w", encoding="utf-8") as f:
+                    json.dump(state, f, ensure_ascii=False)
+                return {
+                    "status": "success",
+                    "message": f"Làm lại thành công (Bước {curr_idx + 1}/{len(snapshots)})",
+                    "remaining_undo": curr_idx,
+                    "remaining_redo": len(snapshots) - 1 - curr_idx
+                }
+        return {"status": "error", "message": "Đã ở trạng thái mới nhất, không có bước nào để Redo"}
+    except Exception as e:
+        return {"status": "error", "message": f"Lỗi thực hiện Redo: {str(e)}"}
 
 class McpCreateProjectRequest(BaseModel):
     projectName: str
@@ -1216,10 +1682,42 @@ class McpToolCallRequest(BaseModel):
     toolName: str
     arguments: Dict[str, Any]
 
-MCP_SERVER_JS = Path("C:/Users/jinnr/.gemini/antigravity-ide/scratch/capcut-roughcut-studio/capcut_mcp_server.js")
+
+MCP_ALLOWED_TOOLS = {
+    "capcut_scan_and_index_footage",
+    "capcut_compile_13layer_draft",
+    "capcut_safe_launch"
+}
+MCP_RUNNER_JS = Path(__file__).parent / "mcp_runner.js"
+
+def get_mcp_server_js() -> Optional[Path]:
+    """Lấy đường dẫn file capcut_mcp_server.js từ biến môi trường CAPCUT_MCP_JS hoặc fallback."""
+    env_path = os.environ.get("CAPCUT_MCP_JS")
+    if env_path:
+        p = Path(env_path).resolve()
+        if p.exists() and p.is_file():
+            return p
+        return None  # Biến môi trường đã được đặt nhưng file không tồn tại
+    # Fallback kiểm tra các vị trí quen thuộc khi không đặt biến môi trường
+    candidates = [
+        Path(__file__).parent.parent / "capcut-roughcut-studio" / "capcut_mcp_server.js",
+        Path.home() / ".gemini" / "antigravity-ide" / "scratch" / "capcut-roughcut-studio" / "capcut_mcp_server.js"
+    ]
+    for c in candidates:
+        if c.exists() and c.is_file():
+            return c.resolve()
+    return None
 
 @app.get("/api/mcp/tools")
 def get_mcp_tools():
+    server_js = get_mcp_server_js()
+    if not server_js:
+        return {
+            "status": "disconnected",
+            "mcp_server": "capcut-commercial-editor",
+            "tools": [],
+            "message": "Chưa cấu hình CAPCUT_MCP_JS hoặc không tìm thấy file script MCP Server"
+        }
     return {
         "status": "connected",
         "mcp_server": "capcut-commercial-editor",
@@ -1244,6 +1742,13 @@ def get_mcp_tools():
 
 @app.post("/api/mcp/create-project")
 def mcp_create_project(req: McpCreateProjectRequest):
+    check_capcut_not_running()
+    server_js = get_mcp_server_js()
+    if not server_js:
+        raise HTTPException(
+            status_code=501,
+            detail="MCP Server chưa được cấu hình hoặc không tìm thấy tệp script (Vui lòng đặt biến môi trường CAPCUT_MCP_JS)"
+        )
     import subprocess
     import tempfile
     
@@ -1260,68 +1765,83 @@ def mcp_create_project(req: McpCreateProjectRequest):
         "scriptSentences": req.scriptSentences
     }
     
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tf:
-        json.dump(payload, tf, ensure_ascii=False)
-        temp_input = tf.name
-        
-    mcp_path_str = str(MCP_SERVER_JS).replace('\\', '/')
-    temp_input_str = temp_input.replace('\\', '/')
-    js_code = f"""
-    const fs = require('fs');
-    const m = require('{mcp_path_str}');
-    const params = JSON.parse(fs.readFileSync('{temp_input_str}', 'utf-8'));
-    const result = m.compile13LayerCommercialDraft(params);
-    console.log(JSON.stringify(result));
-    """
+    runner_input = {
+        "action": "create_project",
+        "toolName": "capcut_compile_13layer_draft",
+        "args": payload
+    }
     
+    temp_input = None
     try:
-        proc = subprocess.run(["node", "-e", js_code], capture_output=True, text=True, check=True)
-        res_data = json.loads(proc.stdout.strip())
-        return res_data
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tf:
+            json.dump(runner_input, tf, ensure_ascii=False)
+            temp_input = tf.name
+            
+        proc = subprocess.run(
+            ["node", str(MCP_RUNNER_JS), str(server_js), temp_input],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return json.loads(proc.stdout.strip())
+    except subprocess.CalledProcessError as cpe:
+        err_msg = cpe.stderr.strip() or cpe.stdout.strip()
+        raise HTTPException(status_code=500, detail=f"Lỗi MCP runner: {err_msg}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi MCP compilation: {str(e)}")
     finally:
-        try: os.unlink(temp_input)
-        except: pass
+        if temp_input and os.path.exists(temp_input):
+            try:
+                os.unlink(temp_input)
+            except Exception:
+                pass
 
 @app.post("/api/mcp/call-tool")
 def mcp_call_tool(req: McpToolCallRequest):
+    # Whitelist toolName check
+    if req.toolName not in MCP_ALLOWED_TOOLS:
+        raise HTTPException(status_code=400, detail=f"Tên tool MCP không hợp lệ: {req.toolName}")
+        
+    server_js = get_mcp_server_js()
+    if not server_js:
+        raise HTTPException(
+            status_code=501,
+            detail="MCP Server chưa được cấu hình hoặc không tìm thấy tệp script (Vui lòng đặt biến môi trường CAPCUT_MCP_JS)"
+        )
+        
     import subprocess
     import tempfile
     
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tf:
-        json.dump(req.arguments, tf, ensure_ascii=False)
-        temp_input = tf.name
-        
-    mcp_path_str = str(MCP_SERVER_JS).replace('\\', '/')
-    temp_input_str = temp_input.replace('\\', '/')
-    tool_name = req.toolName
+    runner_input = {
+        "action": "call_tool",
+        "toolName": req.toolName,
+        "args": req.arguments or {}
+    }
     
-    js_code = f"""
-    const fs = require('fs');
-    const m = require('{mcp_path_str}');
-    const args = JSON.parse(fs.readFileSync('{temp_input_str}', 'utf-8'));
-    let out = {{}};
-    if ('{tool_name}' === 'capcut_scan_and_index_footage') {{
-        const fm = new m.FootageManager();
-        out = fm.scanFolder(args.folderPath || args.brollFolderPath);
-    }} else if ('{tool_name}' === 'capcut_compile_13layer_draft') {{
-        out = m.compile13LayerCommercialDraft(args);
-    }} else if ('{tool_name}' === 'capcut_safe_launch') {{
-        out = {{ ok: true, message: 'Đã gửi lệnh mở CapCut an toàn' }};
-    }} else {{
-        out = {{ ok: false, error: 'Tool không tồn tại' }};
-    }}
-    console.log(JSON.stringify(out));
-    """
+    temp_input = None
     try:
-        proc = subprocess.run(["node", "-e", js_code], capture_output=True, text=True, check=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tf:
+            json.dump(runner_input, tf, ensure_ascii=False)
+            temp_input = tf.name
+            
+        proc = subprocess.run(
+            ["node", str(MCP_RUNNER_JS), str(server_js), temp_input],
+            capture_output=True,
+            text=True,
+            check=True
+        )
         return json.loads(proc.stdout.strip())
+    except subprocess.CalledProcessError as cpe:
+        err_msg = cpe.stderr.strip() or cpe.stdout.strip()
+        raise HTTPException(status_code=500, detail=f"Lỗi thực thi MCP tool: {err_msg}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi MCP tool call: {str(e)}")
     finally:
-        try: os.unlink(temp_input)
-        except: pass
+        if temp_input and os.path.exists(temp_input):
+            try:
+                os.unlink(temp_input)
+            except Exception:
+                pass
 
 class FootageFolderAnalysisRequest(BaseModel):
     folder_path: str
@@ -1333,9 +1853,11 @@ class ScriptParseRequest(BaseModel):
 
 @app.post("/api/ai-agent/analyze-footage-folder")
 def api_analyze_footage_folder(req: FootageFolderAnalysisRequest):
+    # Validate folder path an toàn
+    valid_folder = validate_folder_path(req.folder_path)
     try:
         import footage_analyzer
-        return footage_analyzer.scan_and_analyze_folder(req.folder_path, max_files=req.max_files or 20)
+        return footage_analyzer.scan_and_analyze_folder(str(valid_folder), max_files=req.max_files or 20)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi phân tích footage: {str(e)}")
 

@@ -29,7 +29,9 @@ wheels/
 *.bak
 *.json.bak
 *.json.tmp
+.history/
+scratch/
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Testing
+.pytest_cache/
+

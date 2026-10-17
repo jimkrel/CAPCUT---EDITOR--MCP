@@ -1,9 +1,11 @@
-let currentProject = "BBSM_SET3_21";
+let currentProject = localStorage.getItem('capcut_last_project') || "";
 let projectData = null;
 let selectedSegment = null;
 let currentPlayheadUs = 0;
 let isPlaying = false;
-let playInterval = null;
+let playAnimFrameId = null;
+let playStartTime = 0;
+let playStartUs = 0;
 let zoomFactor = 1.0;
 let currentTool = "select"; // 'select' or 'razor'
 let isDraggingClip = false;
@@ -17,91 +19,355 @@ let showBBoxOverlay = true;
 let isAgentAutoRunning = false;
 let agentAutoTimer = null;
 let agentFixedIds = new Set();
+let scanDebounceTimer = null;
 
 const PX_PER_SECOND_BASE = 85;
 
+// Helper: Escape chuỗi chống XSS
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Helper: Hệ thống Toast notification góc dưới phải
+function getToastContainer() {
+  let c = document.getElementById('toastContainer');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'toastContainer';
+    c.className = 'toast-container';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+
+function showToast(message, type = 'info', actionText = null, actionCb = null, duration = 4000) {
+  const container = getToastContainer();
+  const toast = document.createElement('div');
+  toast.className = `toast-item toast-${type}`;
+  
+  const icon = type === 'success' ? '✓' : (type === 'error' ? '✕' : (type === 'warn' ? '⚠' : 'ℹ'));
+  
+  let html = `<span class="toast-icon">${icon}</span><span class="toast-msg">${esc(message)}</span>`;
+  if (actionText && typeof actionCb === 'function') {
+    html += `<button class="toast-action-btn" type="button">${esc(actionText)}</button>`;
+  }
+  html += `<button class="toast-close-btn" type="button">&times;</button>`;
+  toast.innerHTML = html;
+  
+  if (actionText && typeof actionCb === 'function') {
+    const actBtn = toast.querySelector('.toast-action-btn');
+    actBtn.onclick = () => {
+      try { actionCb(); } catch (e) { console.error(e); }
+      toast.remove();
+    };
+  }
+  
+  toast.querySelector('.toast-close-btn').onclick = () => toast.remove();
+  
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add('toast-fade-out');
+    setTimeout(() => toast.remove(), 250);
+  }, duration);
+}
+
+// Debounce quét lỗi timeline
+function debouncedScanErrors(delay = 600) {
+  clearTimeout(scanDebounceTimer);
+  scanDebounceTimer = setTimeout(() => {
+    scanCurrentProjectErrors();
+  }, delay);
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+  initSplitters();
+  checkCapCutStatus();
   await fetchProjects();
-  await loadProject(currentProject);
+  if (currentProject) {
+    await loadProject(currentProject);
+  }
   setupTimelineInteractions();
   setupKeyboardShortcuts();
 });
+
+// Kiểm tra trạng thái CapCut Desktop đang chạy (Mục 2.3 & Phase 5)
+async function checkCapCutStatus() {
+  try {
+    const res = await fetch('/api/capcut-status');
+    const data = await res.json();
+    const banner = document.getElementById('capcutStatusBanner');
+    if (banner) {
+      banner.style.display = data.is_running ? 'flex' : 'none';
+    }
+  } catch (e) {
+    console.debug('Failed to check capcut status:', e);
+  }
+}
+
+// Khởi tạo các Splitter kéo đổi kích thước 3 cột và timeline (Lưu localStorage)
+function initSplitters() {
+  // 1. Splitter trái: Thư viện
+  const splLeft = document.getElementById('splitterLeft');
+  const panelAssets = document.getElementById('panelAssets');
+  if (splLeft && panelAssets) {
+    const savedW = localStorage.getItem('capcut_asset_width');
+    if (savedW) panelAssets.style.width = `${savedW}px`;
+    
+    let isDragging = false;
+    splLeft.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      splLeft.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const newW = Math.max(240, Math.min(480, e.clientX));
+      panelAssets.style.width = `${newW}px`;
+      localStorage.setItem('capcut_asset_width', newW);
+    });
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        splLeft.classList.remove('active');
+        document.body.style.cursor = '';
+      }
+    });
+  }
+
+  // 2. Splitter phải: Inspector
+  const splRight = document.getElementById('splitterRight');
+  const panelDetails = document.getElementById('panelDetails');
+  if (splRight && panelDetails) {
+    const savedW = localStorage.getItem('capcut_inspector_width');
+    if (savedW) panelDetails.style.width = `${savedW}px`;
+    if (localStorage.getItem('capcut_inspector_folded') === 'true') {
+      panelDetails.classList.add('folded');
+    }
+    
+    let isDragging = false;
+    splRight.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      splRight.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const newW = Math.max(240, Math.min(480, window.innerWidth - e.clientX));
+      panelDetails.style.width = `${newW}px`;
+      localStorage.setItem('capcut_inspector_width', newW);
+    });
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        splRight.classList.remove('active');
+        document.body.style.cursor = '';
+      }
+    });
+  }
+
+  // 3. Splitter ngang: Chiều cao Timeline
+  const splTl = document.getElementById('splitterTimeline');
+  const lowerTimeline = document.getElementById('lowerTimeline');
+  if (splTl && lowerTimeline) {
+    const savedH = localStorage.getItem('capcut_timeline_height');
+    if (savedH) lowerTimeline.style.height = `${savedH}px`;
+    
+    let isDragging = false;
+    splTl.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      splTl.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const newH = Math.max(160, Math.min(window.innerHeight * 0.7, window.innerHeight - e.clientY));
+      lowerTimeline.style.height = `${newH}px`;
+      localStorage.setItem('capcut_timeline_height', newH);
+    });
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        splTl.classList.remove('active');
+        document.body.style.cursor = '';
+      }
+    });
+  }
+}
+
+// Bật/tắt gập Inspector phải
+function toggleInspectorFold() {
+  const panel = document.getElementById('panelDetails');
+  if (!panel) return;
+  const isFolded = panel.classList.toggle('folded');
+  localStorage.setItem('capcut_inspector_folded', isFolded);
+}
+
+// Sao chép văn bản vào bộ nhớ tạm
+function copyTextToClipboard(text) {
+  if (!text || text === '--') return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Đã sao chép đường dẫn', 'success');
+    }).catch(() => {
+      showToast('Không thể sao chép', 'warn');
+    });
+  }
+}
+
+// Nút Xuất dự án
+function exportDraft() {
+  showToast(`Dự án "${currentProject || 'Hiện tại'}" đã được lưu an toàn trong thư mục CapCut Desktop. Bạn có thể mở CapCut để render video.`, 'success', null, null, 6000);
+}
 
 // 1. Fetch available projects
 async function fetchProjects() {
   try {
     const res = await fetch('/api/projects');
+    if (!res.ok) {
+      showToast('Không thể tải danh sách dự án CapCut', 'error');
+      return;
+    }
     const data = await res.json();
     const select = document.getElementById('projectSelect');
+    if (!select) return;
     select.innerHTML = '';
     
-    // Auto-pick the best project with real footage if BBSM_SET3_21 or MASTER is available
-    if (data.projects && data.projects.length > 0) {
-      const preferred = data.projects.find(p => p.name === 'BBSM_SET3_21') 
-                     || data.projects.find(p => p.name === 'BBSM_SET3_21_MASTER_CINEMATIC')
-                     || data.projects.find(p => p.has_footage)
-                     || data.projects[0];
-      if (preferred) {
-        currentProject = preferred.name;
-      }
+    if (data.warning) {
+      showToast(data.warning, 'warn', null, null, 6000);
     }
     
-    data.projects.forEach(p => {
+    const projects = data.projects || [];
+    if (projects.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = '(Không tìm thấy dự án CapCut)';
+      select.appendChild(opt);
+      renderProjectErrorState('', 'Không tìm thấy dự án CapCut nào trên máy tính.');
+      return;
+    }
+    
+    // Ưu tiên: 1. Project đã lưu trong localStorage; 2. Project có footage; 3. Project đầu tiên
+    const saved = localStorage.getItem('capcut_last_project');
+    const hasSaved = projects.find(p => p.name === saved);
+    if (hasSaved) {
+      currentProject = saved;
+    } else {
+      const preferred = projects.find(p => p.has_footage && !p.error) || projects[0];
+      currentProject = preferred ? preferred.name : projects[0].name;
+    }
+    
+    projects.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
-      const tag = p.has_footage ? `🎬 (${p.video_count} footage · ${p.duration_sec}s)` : `(Text & FX)`;
+      let tag = p.has_footage ? `🎬 (${p.video_count} clip · ${p.duration_sec}s)` : `(Text & FX)`;
+      if (p.error) tag = `⚠️ [Lỗi draft]`;
       opt.textContent = `${p.name} ${tag}`;
       if (p.name === currentProject) opt.selected = true;
       select.appendChild(opt);
     });
   } catch (err) {
     console.error('Failed to fetch projects:', err);
+    showToast('Lỗi kết nối máy chủ CapCut Web Studio', 'error');
   }
 }
 
 // 2. Load project data
 let currentComponentFilter = 'all';
 
-async function loadProject(projectName) {
+function renderProjectErrorState(projectName, errorMsg) {
+  const container = document.getElementById('tracksContainer');
+  if (container) {
+    container.innerHTML = `
+      <div class="project-error-card">
+        <div class="project-error-icon">⚠️</div>
+        <div class="project-error-title">Không thể tải dự án "${esc(projectName || 'Chưa chọn')}"</div>
+        <div class="project-error-desc">${esc(errorMsg || 'Vui lòng kiểm tra lại file draft_content.json')}</div>
+        <div class="project-error-hints">
+          <div>• Đảm bảo phần mềm CapCut Desktop đã được đóng hoàn toàn.</div>
+          <div>• Kiểm tra xem draft có bị mã hóa hoặc file JSON bị hỏng không.</div>
+          <div>• Kiểm tra biến môi trường CAPCUT_DRAFTS_DIR trỏ đúng thư mục dự án.</div>
+        </div>
+        <button class="btn-retry-load" type="button" onclick="fetchProjects()">🔄 Tải lại danh sách dự án</button>
+      </div>
+    `;
+  }
+}
+
+async function loadProject(projectName, preserveView = false) {
+  if (!projectName) return;
   currentProject = projectName;
+  
+  // Lưu vị trí scroll và zoom hiện tại nếu preserveView
+  const timelineScroll = document.getElementById('timelineScroll');
+  const prevScrollLeft = timelineScroll ? timelineScroll.scrollLeft : 0;
+  
   try {
-    const res = await fetch(`/api/project/${projectName}`);
+    const res = await fetch(`/api/project/${encodeURIComponent(projectName)}`);
+    if (!res.ok) {
+      let detailMsg = 'Draft không đọc được hoặc không tồn tại';
+      try {
+        const errJson = await res.json();
+        detailMsg = errJson.detail || detailMsg;
+      } catch (e) {}
+      renderProjectErrorState(projectName, detailMsg);
+      showToast(`Không thể đọc dự án "${projectName}": ${detailMsg}`, 'error');
+      return;
+    }
+    
     projectData = await res.json();
+    localStorage.setItem('capcut_last_project', projectName);
     
     // Update Details panel
     const durSec = (projectData.duration_us || 0) / 1000000;
     const durFormatted = formatTimecode(projectData.duration_us || 0);
     
-    document.getElementById('detName').textContent = projectData.project_name;
-    document.getElementById('detPath').textContent = projectData.path;
-    document.getElementById('detDuration').textContent = `${durFormatted} (${durSec.toFixed(2)}s)`;
-    document.getElementById('detFps').textContent = `${projectData.fps || 30} fps · Rec. 709 SDR`;
-    document.getElementById('detTracks').textContent = `${projectData.tracks.length} tracks`;
+    const detName = document.getElementById('detName'); if (detName) detName.textContent = projectData.project_name || '';
+    const detPath = document.getElementById('detPath'); if (detPath) detPath.textContent = projectData.path || '';
+    const detDuration = document.getElementById('detDuration'); if (detDuration) detDuration.textContent = `${durFormatted} (${durSec.toFixed(2)}s)`;
+    const detFps = document.getElementById('detFps'); if (detFps) detFps.textContent = `${projectData.fps || 30} fps · ${projectData.color_space || 'Rec. 709'}`;
+    const detTracks = document.getElementById('detTracks'); if (detTracks) detTracks.textContent = `${(projectData.tracks || []).length} tracks`;
     
     // Update raw stats pills
     const stats = projectData.raw_stats || {};
     const comps = projectData.components || [];
-    document.getElementById('statAllCount').textContent = comps.length;
-    document.getElementById('statVideoCount').textContent = stats.video_count || 0;
-    document.getElementById('statAudioCount').textContent = stats.audio_count || 0;
-    document.getElementById('statTextCount').textContent = stats.text_count || 0;
-    document.getElementById('statEffectCount').textContent = stats.effect_count || 0;
-    document.getElementById('statStickerCount').textContent = stats.sticker_count || 0;
+    const statAll = document.getElementById('statAllCount'); if (statAll) statAll.textContent = comps.length;
+    const statVid = document.getElementById('statVideoCount'); if (statVid) statVid.textContent = stats.video_count || 0;
+    const statAud = document.getElementById('statAudioCount'); if (statAud) statAud.textContent = stats.audio_count || 0;
+    const statTxt = document.getElementById('statTextCount'); if (statTxt) statTxt.textContent = stats.text_count || 0;
+    const statEff = document.getElementById('statEffectCount'); if (statEff) statEff.textContent = stats.effect_count || 0;
+    const statStk = document.getElementById('statStickerCount'); if (statStk) statStk.textContent = stats.sticker_count || 0;
     
     // Setup filter pills and render component list
     setupComponentFilters();
     renderComponentList(currentComponentFilter, '');
     
     // Update duration & timecode
-    document.getElementById('totalTimecode').textContent = durFormatted;
+    const totTc = document.getElementById('totalTimecode'); if (totTc) totTc.textContent = durFormatted;
+    const tlTot = document.getElementById('timelineTotTC'); if (tlTot) tlTot.textContent = durFormatted;
     
     renderRuler(durSec);
     renderTracks();
     renderMediaTab();
     updatePlayheadPosition(currentPlayheadUs);
-    await scanCurrentProjectErrors();
+    
+    if (preserveView && timelineScroll) {
+      timelineScroll.scrollLeft = prevScrollLeft;
+    }
+    
+    debouncedScanErrors(300);
   } catch (err) {
     console.error('Failed to load project:', err);
+    renderProjectErrorState(projectName, err.message);
+    showToast(`Lỗi khi mở dự án: ${err.message}`, 'error');
   }
 }
 
@@ -711,7 +977,7 @@ async function setClipSpeed(speedVal) {
 
 function openClipAIPanel() {
   if (!selectedSegment) {
-    alert('Vui lòng chọn một clip trên dòng thời gian hoặc trong danh sách thành phần');
+    showToast('Vui lòng chọn một clip trên dòng thời gian hoặc trong danh sách thành phần', 'warn');
     return;
   }
   openAIPanel();
@@ -843,6 +1109,11 @@ function switchDetailTab(type) {
 }
 
 // 8. Video Player Streaming & Playhead Sync
+function getTimelineHeaderOffset() {
+  const el = document.querySelector('.timeline-track-header') || document.querySelector('.track-header') || document.querySelector('.ruler-header-spacer');
+  return el ? el.offsetWidth : 110;
+}
+
 function setupTimelineInteractions() {
   const container = document.getElementById('timelineScroll');
   if (!container) return;
@@ -850,53 +1121,21 @@ function setupTimelineInteractions() {
   container.addEventListener('click', (e) => {
     if (isDraggingClip) return;
     const rect = container.getBoundingClientRect();
-    const clickX = e.clientX - rect.left + container.scrollLeft - 110; // 110px header width
+    const headerWidth = getTimelineHeaderOffset();
+    const clickX = e.clientX - rect.left + container.scrollLeft - headerWidth;
     if (clickX < 0) return;
     
     const pxPerSec = PX_PER_SECOND_BASE * zoomFactor;
     const clickSec = clickX / pxPerSec;
     updatePlayheadPosition(Math.max(0, Math.round(clickSec * 1000000)));
   });
-  
-  // Setup Keyboard Shortcuts (CapCut Standard)
-  window.addEventListener('keydown', (e) => {
-    // Avoid triggering when user is typing in inputs or textarea
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-    
-    if (e.code === 'Space') {
-      e.preventDefault();
-      togglePlay();
-    } else if (e.key === 'v' || e.key === 'V') {
-      setTool('select');
-    } else if (e.key === 'b' || e.key === 'B') {
-      if (!e.ctrlKey) setTool('razor');
-    } else if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
-      e.preventDefault();
-      splitSelectedAtPlayhead();
-    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault();
-      deleteSelected();
-    } else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
-      e.preventDefault();
-      undoAction();
-    } else if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
-      e.preventDefault();
-      duplicateSelected();
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      updatePlayheadPosition(Math.max(0, currentPlayheadUs - 100000));
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      const totalUs = projectData?.duration_us || 9133333;
-      updatePlayheadPosition(Math.min(totalUs, currentPlayheadUs + 100000));
-    }
-  });
 }
 
 function updatePlayheadPosition(timeUs) {
   currentPlayheadUs = timeUs;
   const pxPerSec = PX_PER_SECOND_BASE * zoomFactor;
-  const leftPx = 110 + (timeUs / 1000000) * pxPerSec;
+  const headerWidth = getTimelineHeaderOffset();
+  const leftPx = headerWidth + (timeUs / 1000000) * pxPerSec;
   
   const playhead = document.getElementById('playhead');
   if (playhead) playhead.style.left = `${leftPx}px`;
@@ -922,7 +1161,7 @@ function zoomTimelineStep(delta) {
   zoomFactor = Math.max(0.3, Math.min(3.0, zoomFactor + delta));
   const slider = document.getElementById('zoomSlider');
   if (slider) slider.value = Math.round(zoomFactor * 100);
-  const durSec = (projectData?.duration_us || 9133333) / 1000000;
+  const durSec = (projectData?.duration_us || 0) / 1000000;
   renderRuler(durSec);
   renderTracks();
   updatePlayheadPosition(currentPlayheadUs);
@@ -931,8 +1170,9 @@ function zoomTimelineStep(delta) {
 function fitTimeline() {
   const container = document.getElementById('timelineScroll');
   if (!container || !projectData) return;
-  const availWidth = container.clientWidth - 130;
-  const durSec = (projectData.duration_us || 9133333) / 1e6;
+  const headerWidth = getTimelineHeaderOffset();
+  const availWidth = container.clientWidth - (headerWidth + 20);
+  const durSec = (projectData.duration_us || 0) / 1e6;
   if (durSec <= 0) return;
   
   zoomFactor = Math.max(0.3, Math.min(3.0, availWidth / (durSec * PX_PER_SECOND_BASE)));
@@ -960,162 +1200,343 @@ function toggleLinkage() {
 }
 
 function freezeSelected() {
-  if (!selectedSegment) { alert('Vui lòng chọn 1 clip để đóng băng khung hình'); return; }
+  if (!selectedSegment) {
+    showToast('Vui lòng chọn 1 clip để đóng băng khung hình', 'warn');
+    return;
+  }
   applyQuickPrompt(`Đóng băng khung hình tại ${(currentPlayheadUs/1e6).toFixed(2)}s cho clip "${selectedSegment.label}"`);
   openAIPanel();
 }
 
 function reverseSelected() {
-  if (!selectedSegment) { alert('Vui lòng chọn 1 clip để đảo ngược'); return; }
+  if (!selectedSegment) {
+    showToast('Vui lòng chọn 1 clip để đảo ngược', 'warn');
+    return;
+  }
   applyQuickPrompt(`Đảo ngược (Reverse playback) clip "${selectedSegment.label}"`);
   openAIPanel();
 }
 
-function redoAction() {
-  alert('Redo: Hiện đã là trạng thái mới nhất của draft.');
+// Preview audio player helper
+function getPreviewAudioPlayer() {
+  let a = document.getElementById('previewAudioPlayer');
+  if (!a) {
+    a = document.createElement('audio');
+    a.id = 'previewAudioPlayer';
+    a.preload = 'auto';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+  }
+  return a;
 }
+
+let activeVideoSegment = null;
 
 function syncPlayerMedia(timeUs) {
   if (!projectData || !projectData.tracks) return;
   const display = document.getElementById('activeTextDisplay');
   const videoPlayer = document.getElementById('mainVideoPlayer');
+  const audioPlayer = getPreviewAudioPlayer();
   
   let activeText = '';
   let activeVideoPath = '';
   let videoOffsetSec = 0;
+  let activeAudioPath = '';
+  let audioOffsetSec = 0;
+  let activeAudioVol = 1.0;
+  activeVideoSegment = null;
   
-  for (const track of projectData.tracks) {
-    if (track.type === 'text') {
-      for (const seg of track.segments) {
-        if (timeUs >= seg.start_us && timeUs < seg.end_us) {
-          activeText = seg.label;
-          break;
-        }
-      }
-    } else if (track.type === 'video') {
-      for (const seg of track.segments) {
+  // Duyệt tracks: video tracks ưu tiên lớp trên cùng (reverse duyệt để lấy V2/V3 trên V1)
+  const tracksReversed = [...projectData.tracks].reverse();
+  for (const track of tracksReversed) {
+    if (track.type === 'video' && !activeVideoPath) {
+      for (const seg of track.segments || []) {
         if (timeUs >= seg.start_us && timeUs < seg.end_us && seg.media_path) {
           activeVideoPath = seg.media_path;
           videoOffsetSec = (timeUs - seg.start_us) / 1e6;
+          activeVideoSegment = seg;
           break;
         }
       }
     }
   }
   
-  display.textContent = activeText || '';
-  
-  if (activeVideoPath) {
-    const streamUrl = `/api/media?path=${encodeURIComponent(activeVideoPath)}`;
-    if (videoPlayer.src !== window.location.origin + streamUrl) {
-      videoPlayer.src = streamUrl;
-      videoPlayer.currentTime = videoOffsetSec;
-      if (isPlaying) videoPlayer.play().catch(() => {});
-    } else {
-      if (Math.abs(videoPlayer.currentTime - videoOffsetSec) > 0.3) {
-        videoPlayer.currentTime = videoOffsetSec;
+  // Duyệt tracks text & audio
+  for (const track of projectData.tracks) {
+    if (track.type === 'text') {
+      for (const seg of track.segments || []) {
+        if (timeUs >= seg.start_us && timeUs < seg.end_us) {
+          activeText = seg.details?.text || seg.label;
+          break;
+        }
+      }
+    } else if (track.type === 'audio' && !activeAudioPath) {
+      for (const seg of track.segments || []) {
+        if (timeUs >= seg.start_us && timeUs < seg.end_us && seg.media_path) {
+          activeAudioPath = seg.media_path;
+          audioOffsetSec = (timeUs - seg.start_us) / 1e6;
+          activeAudioVol = seg.volume != null ? seg.volume : 1.0;
+          break;
+        }
       }
     }
-    videoPlayer.style.display = 'block';
-  } else {
-    videoPlayer.style.display = 'none';
   }
+  
+  if (display) display.textContent = activeText || '';
+  
+  // Đồng bộ Video Player
+  if (videoPlayer) {
+    if (activeVideoPath) {
+      const streamUrl = `/api/media?path=${encodeURIComponent(activeVideoPath)}`;
+      const fullUrl = window.location.origin + streamUrl;
+      if (videoPlayer.src !== fullUrl) {
+        videoPlayer.src = streamUrl;
+        videoPlayer.currentTime = videoOffsetSec;
+        if (isPlaying) videoPlayer.play().catch(() => {});
+      } else {
+        if (Math.abs(videoPlayer.currentTime - videoOffsetSec) > 0.25) {
+          videoPlayer.currentTime = videoOffsetSec;
+        }
+      }
+      videoPlayer.style.display = 'block';
+    } else {
+      // Khi không có video tại playhead, vẫn giữ khung hình mờ thay vì tắt phụt
+      if (videoPlayer.paused) {
+        // Giữ nguyên frame
+      } else {
+        videoPlayer.pause();
+      }
+    }
+  }
+  
+  // Đồng bộ Audio Player
+  if (audioPlayer) {
+    if (activeAudioPath) {
+      const audioUrl = `/api/media?path=${encodeURIComponent(activeAudioPath)}`;
+      const fullAudioUrl = window.location.origin + audioUrl;
+      audioPlayer.volume = Math.max(0.0, Math.min(1.0, activeAudioVol));
+      if (audioPlayer.src !== fullAudioUrl) {
+        audioPlayer.src = audioUrl;
+        audioPlayer.currentTime = audioOffsetSec;
+        if (isPlaying) audioPlayer.play().catch(() => {});
+      } else {
+        if (Math.abs(audioPlayer.currentTime - audioOffsetSec) > 0.3) {
+          audioPlayer.currentTime = audioOffsetSec;
+        }
+      }
+    } else {
+      if (!audioPlayer.paused) audioPlayer.pause();
+    }
+  }
+}
+
+function playLoop(timestamp) {
+  if (!isPlaying) return;
+  if (!playStartTime) playStartTime = timestamp;
+  const elapsedMs = timestamp - playStartTime;
+  const totalUs = projectData ? (projectData.duration_us || 0) : 0;
+  
+  const videoPlayer = document.getElementById('mainVideoPlayer');
+  let currentUs;
+  if (videoPlayer && !videoPlayer.paused && videoPlayer.duration > 0 && activeVideoSegment) {
+    currentUs = activeVideoSegment.start_us + Math.round(videoPlayer.currentTime * 1e6);
+  } else {
+    currentUs = playStartUs + Math.round(elapsedMs * 1000);
+  }
+  
+  if (totalUs > 0 && currentUs >= totalUs) {
+    updatePlayheadPosition(0);
+    togglePlay();
+    return;
+  }
+  
+  updatePlayheadPosition(currentUs);
+  playAnimFrameId = requestAnimationFrame(playLoop);
 }
 
 function togglePlay() {
   isPlaying = !isPlaying;
   const btn = document.getElementById('playBtn');
   const videoPlayer = document.getElementById('mainVideoPlayer');
+  const audioPlayer = getPreviewAudioPlayer();
   
   if (isPlaying) {
-    btn.textContent = '⏸';
-    const startTime = Date.now();
-    const startUs = currentPlayheadUs;
-    const totalUs = projectData ? (projectData.duration_us || 9133333) : 9133333;
+    if (btn) btn.textContent = '⏸';
+    playStartTime = 0;
+    playStartUs = currentPlayheadUs;
     if (videoPlayer && videoPlayer.src) videoPlayer.play().catch(() => {});
-    
-    playInterval = setInterval(() => {
-      const elapsedUs = (Date.now() - startTime) * 1000;
-      let nextUs = startUs + elapsedUs;
-      if (nextUs >= totalUs) {
-        nextUs = 0;
-        togglePlay();
-      }
-      updatePlayheadPosition(nextUs);
-    }, 33);
+    if (audioPlayer && audioPlayer.src) audioPlayer.play().catch(() => {});
+    playAnimFrameId = requestAnimationFrame(playLoop);
   } else {
-    btn.textContent = '▶';
-    clearInterval(playInterval);
+    if (btn) btn.textContent = '▶';
+    if (playAnimFrameId) cancelAnimationFrame(playAnimFrameId);
+    playAnimFrameId = null;
     if (videoPlayer) videoPlayer.pause();
+    if (audioPlayer) audioPlayer.pause();
   }
 }
 
-// 9. Split and Delete Operations
+// 9. Split and Delete Operations với cơ chế chống bấm đúp
+let isOperationPending = false;
+
 async function splitSelectedAtPlayhead(targetId) {
-  const segId = targetId || (selectedSegment ? selectedSegment.id : null);
+  if (isOperationPending) return;
+  let segId = targetId || (selectedSegment ? selectedSegment.id : null);
+  
+  // Tự động tìm segment tại playhead nếu chưa chọn
+  if (!segId && projectData && projectData.tracks) {
+    for (const t of projectData.tracks) {
+      for (const s of t.segments || []) {
+        if (currentPlayheadUs > s.start_us && currentPlayheadUs < s.end_us) {
+          segId = s.id;
+          selectedSegment = s;
+          break;
+        }
+      }
+      if (segId) break;
+    }
+  }
+  
   if (!segId) {
-    alert('Vui lòng chọn 1 clip để cắt đôi');
+    showToast('Vui lòng chọn 1 clip hoặc đặt playhead trên clip để cắt đôi', 'warn');
     return;
   }
   
-  const res = await fetch('/api/split-clip', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      project_name: currentProject,
-      command: 'split',
-      target_segment_id: segId,
-      playhead_time_us: currentPlayheadUs
-    })
-  });
-  const data = await res.json();
-  if (data.status === 'success') {
-    await loadProject(currentProject);
-  } else {
-    alert(data.message);
+  isOperationPending = true;
+  try {
+    const res = await fetch('/api/split-clip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: currentProject,
+        command: 'split',
+        target_segment_id: segId,
+        playhead_time_us: currentPlayheadUs
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      showToast(data.message || 'Đã cắt clip thành công', 'success');
+      await loadProject(currentProject, true);
+    } else {
+      showToast(data.message || data.detail || 'Không thể cắt clip', 'error');
+    }
+  } catch (e) {
+    showToast(`Lỗi khi cắt clip: ${e.message}`, 'error');
+  } finally {
+    isOperationPending = false;
   }
 }
 
 async function deleteSelected() {
-  if (!selectedSegment) return;
-  const res = await fetch('/api/delete-clip', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      project_name: currentProject,
-      command: 'delete',
-      target_segment_id: selectedSegment.id
-    })
-  });
-  const data = await res.json();
-  if (data.status === 'success') {
-    selectedSegment = null;
-    switchDetailTab('project');
-    await loadProject(currentProject);
+  if (isOperationPending) return;
+  if (!selectedSegment) {
+    showToast('Vui lòng chọn 1 clip để xóa', 'warn');
+    return;
+  }
+  const segId = selectedSegment.id;
+  const clipLabel = selectedSegment.label || 'Clip';
+  
+  isOperationPending = true;
+  try {
+    const res = await fetch('/api/delete-clip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: currentProject,
+        command: 'delete',
+        target_segment_id: segId
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      selectedSegment = null;
+      switchDetailTab('project');
+      await loadProject(currentProject, true);
+      // Hiển thị toast kèm nút Hoàn tác trong 6 giây theo mục 4.5
+      showToast(`Đã xóa "${clipLabel}"`, 'info', 'Hoàn tác', undoAction, 6000);
+    } else {
+      showToast(data.message || data.detail || 'Không thể xóa clip', 'error');
+    }
+  } catch (e) {
+    showToast(`Lỗi xóa clip: ${e.message}`, 'error');
+  } finally {
+    isOperationPending = false;
   }
 }
 
-// 9b. Missing utility functions
-function undoAction() {
-  // Restore from backup if available
-  fetch(`/api/undo/${currentProject}`, { method: 'POST' })
-    .then(r => r.json())
-    .then(d => {
-      if (d.status === 'success') loadProject(currentProject);
-      else alert('Không có thao tác để hoàn tác (chưa có backup).');
-    })
-    .catch(() => alert('Undo: chưa có backup draft trên server.'));
+// 9b. Undo & Redo & Duplicate operations
+async function undoAction() {
+  if (isOperationPending) return;
+  isOperationPending = true;
+  try {
+    const res = await fetch(`/api/undo/${encodeURIComponent(currentProject)}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      await loadProject(currentProject, true);
+      showToast(data.message || 'Đã hoàn tác thao tác', 'success');
+    } else {
+      showToast(data.message || data.detail || 'Không có lịch sử để hoàn tác', 'warn');
+    }
+  } catch (e) {
+    showToast(`Lỗi hoàn tác: ${e.message}`, 'error');
+  } finally {
+    isOperationPending = false;
+  }
+}
+
+async function redoAction() {
+  if (isOperationPending) return;
+  isOperationPending = true;
+  try {
+    const res = await fetch(`/api/redo/${encodeURIComponent(currentProject)}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      await loadProject(currentProject, true);
+      showToast(data.message || 'Đã làm lại thao tác', 'success');
+    } else {
+      showToast(data.message || data.detail || 'Đã ở trạng thái mới nhất', 'info');
+    }
+  } catch (e) {
+    showToast(`Lỗi làm lại: ${e.message}`, 'error');
+  } finally {
+    isOperationPending = false;
+  }
 }
 
 function addNewTrack() {
-  alert('Tính năng thêm track trống sẽ mở CapCut trực tiếp. Hãy thêm track trong CapCut rồi làm mới trang này.');
+  showToast('Thêm track: Hãy thêm track trực tiếp trong CapCut Desktop rồi tải lại trang.', 'info');
 }
 
 async function duplicateSelected() {
-  if (!selectedSegment) { alert('Vui lòng chọn 1 clip để nhân đôi'); return; }
-  const prompt = `Nhân đôi clip "${selectedSegment.label}" (bắt đầu tại ${(selectedSegment.start_us/1e6).toFixed(2)}s)`;
-  applyQuickPrompt(prompt);
-  openAIPanel();
+  if (isOperationPending) return;
+  if (!selectedSegment) {
+    showToast('Vui lòng chọn 1 clip để nhân đôi', 'warn');
+    return;
+  }
+  const prompt = `Nhân đôi clip "${selectedSegment.label}" (tại ${(selectedSegment.end_us/1e6).toFixed(2)}s)`;
+  showToast(`Đang nhân đôi "${selectedSegment.label}"...`, 'info');
+  isOperationPending = true;
+  try {
+    const res = await fetch('/api/execute-command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: currentProject,
+        command: prompt,
+        target_segment_id: selectedSegment.id
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      showToast('Đã nhân đôi clip thành công', 'success');
+      await loadProject(currentProject, true);
+    }
+  } catch (e) {
+    showToast(`Lỗi nhân đôi: ${e.message}`, 'error');
+  } finally {
+    isOperationPending = false;
+  }
 }
 
 // 10. Quality Gate Audit Modal
@@ -1181,7 +1602,7 @@ async function insertTextPreset(text, color) {
 
 async function applyEffectToSelected(effectName, paramKey) {
   if (!selectedSegment) {
-    alert('Vui lòng chọn 1 clip trên timeline trước khi áp dụng hiệu ứng');
+    showToast('Vui lòng chọn 1 clip trên timeline trước khi áp dụng hiệu ứng', 'warn');
     return;
   }
   applyQuickPrompt(`Áp dụng hiệu ứng "${effectName}" cho clip được chọn với thông số ${paramKey}`);
@@ -1337,22 +1758,115 @@ function formatTimecode(us) {
   const hours = Math.floor(totalSec / 3600).toString().padStart(2, '0');
   const minutes = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0');
   const seconds = Math.floor(totalSec % 60).toString().padStart(2, '0');
-  const frames = Math.floor((totalSec % 1) * 30).toString().padStart(2, '0');
+  const fps = projectData?.fps || 30;
+  const frames = Math.floor((totalSec % 1) * fps).toString().padStart(2, '0');
   return `${hours}:${minutes}:${seconds}:${frames}`;
+}
+
+function closeAllModals() {
+  const modals = document.querySelectorAll('.qa-modal-overlay, .ai-modal-overlay, .mcp-modal-overlay');
+  modals.forEach(m => m.classList.remove('open', 'active'));
 }
 
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const target = e.target;
+    const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
+    const hasModalOpen = document.querySelector('.qa-modal-overlay.open, .ai-modal-overlay.open, .mcp-modal-overlay.open');
+    
+    // Nếu modal đang mở hoặc đang gõ input: Esc đóng modal / blur input
+    if (e.key === 'Escape') {
+      if (hasModalOpen) {
+        e.preventDefault();
+        closeAllModals();
+        return;
+      }
+      if (isInput) {
+        target.blur();
+        return;
+      }
+      // Bỏ chọn clip
+      if (selectedSegment) {
+        selectedSegment = null;
+        switchDetailTab('project');
+        renderTracks();
+      }
+      return;
+    }
+    
+    // Bỏ qua tất cả các phím tắt khác khi đang gõ vào input/textarea/select hoặc khi modal mở
+    if (isInput || hasModalOpen) return;
+    
+    // Space: Phát / Dừng
     if (e.code === 'Space') {
       e.preventDefault();
       togglePlay();
-    } else if (e.code === 'Delete' || e.code === 'Backspace') {
-      deleteSelected();
-    } else if (e.key === 'v' || e.key === 'V') {
+      return;
+    }
+    
+    // Ctrl+B: Cắt đôi tại playhead (Phải kiểm tra ctrl trước B)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      splitSelectedAtPlayhead();
+      return;
+    }
+    
+    // V: Chuyển sang công cụ chọn
+    if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey) {
       setTool('select');
-    } else if (e.key === 'b' || e.key === 'B') {
+      return;
+    }
+    
+    // B: Chuyển sang dao lam (Razor)
+    if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey) {
       setTool('razor');
+      return;
+    }
+    
+    // Delete / Backspace: Xóa clip đã chọn
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      deleteSelected();
+      return;
+    }
+    
+    // Ctrl+Shift+Z hoặc Ctrl+Y: Redo (Làm lại)
+    if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault();
+      redoAction();
+      return;
+    }
+    
+    // Ctrl+Z: Undo (Hoàn tác)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undoAction();
+      return;
+    }
+    
+    // Ctrl+D: Nhân đôi clip đã chọn
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      duplicateSelected();
+      return;
+    }
+    
+    // ← / →: Lùi / tiến 1 frame theo fps thật của project
+    // Shift + ← / →: Lùi / tiến 1 giây
+    const fps = projectData?.fps || 30;
+    const oneFrameUs = Math.round(1000000 / fps);
+    const stepUs = e.shiftKey ? 1000000 : oneFrameUs;
+    const totalUs = projectData?.duration_us || 0;
+    
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      updatePlayheadPosition(Math.max(0, currentPlayheadUs - stepUs));
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      updatePlayheadPosition(Math.min(totalUs, currentPlayheadUs + stepUs));
+      return;
     }
   });
 }
@@ -1455,55 +1969,92 @@ function renderErrorList(category = 'all') {
   
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div style="color: #10b981; font-size: 11px; padding: 24px 12px; text-align: center; background: #14161c; border-radius: 8px; border: 1px dashed #242936;">
+      <div style="color: var(--color-success); font-size: 11px; padding: 24px 12px; text-align: center; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px dashed var(--border-medium);">
         <div style="font-size: 20px; margin-bottom: 6px;">✓</div>
         <strong>Không có lỗi nào thuộc danh mục này!</strong>
-        <div style="color: #64748b; font-size: 10px; margin-top: 4px;">Footage & timeline đạt chuẩn xuất bản thương mại.</div>
+        <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Footage & timeline đạt chuẩn thương mại.</div>
       </div>
     `;
     return;
   }
   
+  // Gộp các lỗi theo Rule / Tên nhóm chính (ví dụ gom 25 lỗi Safe zone thành 1 nhóm)
+  const groups = {};
   filtered.forEach(err => {
-    const card = document.createElement('div');
     const isFixed = agentFixedIds.has(err.id) || err.fixed;
-    card.className = `error-item-card severity-${err.severity.toLowerCase()} ${isFixed ? 'is-fixed' : ''}`;
-    
-    const timeFormatted = formatTimecode(err.start_us);
-    const timeSec = (err.start_us / 1e6).toFixed(2);
-    
+    const groupKey = err.rule_id || err.title || err.category;
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        title: err.title,
+        category: err.category,
+        severity: err.severity,
+        items: []
+      };
+    }
+    if (err.severity === 'CRITICAL') groups[groupKey].severity = 'CRITICAL';
+    groups[groupKey].items.push({ ...err, isFixed });
+  });
+
+  Object.values(groups).forEach(grp => {
+    const card = document.createElement('div');
+    card.className = 'err-group-card';
+    const totalInGroup = grp.items.length;
+    const unfixedItems = grp.items.filter(i => !i.isFixed);
+    const unfixedCount = unfixedItems.length;
+    const sevClass = grp.severity.toLowerCase();
+
     card.innerHTML = `
-      <div class="err-card-header">
-        <span class="err-badge ${isFixed ? 'FIXED' : err.severity}">${isFixed ? '✓ ĐÃ SỬA' : err.severity}</span>
-        <span class="err-time-pill">⏱ ${timeFormatted} (${timeSec}s)</span>
+      <div class="err-group-header" onclick="this.parentElement.querySelector('.err-group-items').style.display = this.parentElement.querySelector('.err-group-items').style.display === 'none' ? 'flex' : 'none'">
+        <div class="err-group-left">
+          <span class="severity-dot ${sevClass}" title="${grp.severity}"></span>
+          <div>
+            <div class="err-group-title">${esc(grp.title)}</div>
+            <div class="err-group-count">${totalInGroup} vị trí · ${unfixedCount > 0 ? `Cần sửa ${unfixedCount}` : '✓ Đã sửa xong'}</div>
+          </div>
+        </div>
+        ${unfixedCount > 0 ? `<button class="btn-fix-all-group" type="button" onclick="event.stopPropagation(); fixEntireErrorGroup('${esc(grp.title)}')">⚡ Sửa tất cả (${totalInGroup})</button>` : `<span style="color:var(--color-success);font-size:11px;font-weight:600;">✓ Đã tối ưu</span>`}
       </div>
-      <div class="err-card-title">${err.title}</div>
-      <div class="err-card-desc">${err.description}</div>
-      <div class="err-card-footer">
-        <span class="err-bbox-coords">🎯 BBox: [${err.bbox.left}%, ${err.bbox.top}%, ${err.bbox.width}%x${err.bbox.height}%]</span>
-        ${!isFixed ? `<button class="btn-card-fix" onclick="event.stopPropagation(); executeSingleAutoFix('${err.id}')">⚡ Sửa lỗi</button>` : `<span style="color:#10b981;font-size:10px;font-weight:700;">Hoàn tất</span>`}
+      <div class="err-group-items" style="display: flex;">
+        ${grp.items.map(item => `
+          <div class="err-single-row" onclick="seekAndHighlightError('${item.id}', ${item.target_time_us || item.start_us}, '${item.segment_id || ''}')">
+            <span class="err-row-time">${formatTimecode(item.start_us)}</span>
+            <span class="err-row-desc" title="${esc(item.description)}">${esc(item.description)}</span>
+            ${!item.isFixed ? `<button class="btn-fix-single" type="button" onclick="event.stopPropagation(); executeSingleAutoFix('${item.id}')">Sửa</button>` : `<span style="color:var(--color-success);font-size:10px;">✓</span>`}
+          </div>
+        `).join('')}
       </div>
     `;
-    
-    card.onclick = () => {
-      // Seek playhead directly to error timestamp
-      updatePlayheadPosition(err.target_time_us || err.start_us);
-      
-      // Highlight segment on timeline if segment_id is given
-      if (err.segment_id) {
-        const segEl = document.querySelector(`.timeline-clip[data-seg-id="${err.segment_id}"]`);
-        if (segEl) {
-          document.querySelectorAll('.timeline-clip').forEach(c => c.classList.remove('selected'));
-          segEl.classList.add('selected');
-        }
-      }
-      
-      // Flash Bounding Box on canvas
-      flashBoundingBox(err.id);
-    };
-    
+
     container.appendChild(card);
   });
+}
+
+// Sửa tất cả lỗi trong 1 nhóm
+async function fixEntireErrorGroup(groupTitle) {
+  const matches = detectedErrors.filter(e => e.title === groupTitle && !agentFixedIds.has(e.id) && !e.fixed);
+  if (matches.length === 0) {
+    showToast('Tất cả vị trí trong nhóm này đã được xử lý xong', 'info');
+    return;
+  }
+  showToast(`Đang tự động sửa ${matches.length} vị trí...`, 'info');
+  for (const m of matches) {
+    await executeSingleAutoFix(m.id);
+  }
+  showToast(`✓ Đã tối ưu xong ${matches.length} vị trí`, 'success');
+  renderErrorList(currentErrorFilter);
+}
+
+// Nhảy playhead đến lỗi và khoanh vùng
+function seekAndHighlightError(errId, timeUs, segId) {
+  updatePlayheadPosition(timeUs);
+  if (segId) {
+    const segEl = document.querySelector(`.timeline-clip[data-seg-id="${segId}"]`);
+    if (segEl) {
+      document.querySelectorAll('.timeline-clip').forEach(c => c.classList.remove('selected'));
+      segEl.classList.add('selected');
+    }
+  }
+  flashBoundingBox(errId);
 }
 
 // 15. Real-time Bounding Box Canvas Overlay (ROI Khoanh Vùng)
@@ -1516,8 +2067,7 @@ function renderActiveBoundingBoxes(timeUs) {
     return;
   }
   
-  // Find errors active at current playhead time
-  // Provide a 150ms grace margin so instantaneous cuts remain visible
+  // Tìm lỗi tại thời điểm playhead
   const activeErrors = detectedErrors.filter(err => {
     const s = err.start_us - 100_000;
     const e = err.end_us + 100_000;
@@ -1532,23 +2082,14 @@ function renderActiveBoundingBoxes(timeUs) {
     
     const boxEl = document.createElement('div');
     boxEl.id = `bbox_${err.id}`;
-    boxEl.className = `error-bbox-item severity-${err.severity.toLowerCase()} ${isFixed ? 'is-fixed' : ''}`;
+    boxEl.className = `error-bbox ${isFixed ? 'is-fixed' : ''}`;
     boxEl.style.left = `${b.left}%`;
     boxEl.style.top = `${b.top}%`;
     boxEl.style.width = `${b.width}%`;
     boxEl.style.height = `${b.height}%`;
     
-    const icon = err.severity === 'CRITICAL' ? '⚠️' : (err.severity === 'WARNING' ? '🔲' : '✨');
-    
     boxEl.innerHTML = `
-      <div class="bbox-corner tl"></div>
-      <div class="bbox-corner tr"></div>
-      <div class="bbox-corner bl"></div>
-      <div class="bbox-corner br"></div>
-      <div class="bbox-header-badge">
-        <span>${icon} ${err.title.slice(0, 32)}</span>
-        ${!isFixed ? `<button class="bbox-quick-fix-btn" onclick="event.stopPropagation(); executeSingleAutoFix('${err.id}')">⚡ AI Sửa</button>` : `<span style="color:#10b981;">✓ Sửa xong</span>`}
-      </div>
+      <div class="error-bbox-tag">${err.title.slice(0, 28)}</div>
     `;
     
     boxEl.onclick = (e) => {
@@ -1566,51 +2107,46 @@ function flashBoundingBox(errId) {
   const bEl = document.getElementById(`bbox_${errId}`);
   if (bEl) {
     bEl.style.transform = 'scale(1.04)';
-    bEl.style.boxShadow = '0 0 25px #00e5ff, inset 0 0 20px #00e5ff';
+    bEl.style.borderColor = '#ffffff';
     setTimeout(() => {
-      bEl.style.transform = '';
-      bEl.style.boxShadow = '';
+      if (bEl) {
+        bEl.style.transform = '';
+        bEl.style.borderColor = '';
+      }
     }, 450);
   }
 }
 
 function toggleBBoxOverlay() {
-  showBBoxOverlay = !showBBoxOverlay;
-  const btn = document.getElementById('btnToggleBBox');
-  if (btn) {
-    btn.classList.toggle('active', showBBoxOverlay);
-    btn.textContent = showBBoxOverlay ? '🎯 Khoanh Lỗi [BẬT]' : '🎯 Khoanh Lỗi [TẮT]';
-  }
+  const chk = document.getElementById('btnToggleBBox');
+  showBBoxOverlay = chk ? chk.checked : !showBBoxOverlay;
   renderActiveBoundingBoxes(currentPlayheadUs);
 }
 
-// 16. Timeline Ruler Error Markers
+function toggleSafeGuide() {
+  const guide = document.getElementById('tiktokSafeGuide');
+  const chk = document.getElementById('btnToggleSafeGuide');
+  const isVis = chk ? chk.checked : !guide.classList.contains('visible');
+  if (guide) guide.classList.toggle('visible', isVis);
+}
+
+// 16. Timeline Ruler Error Markers: Nhỏ 6px nằm ở lane riêng dưới thước số
 function renderTimelineErrorMarkers() {
-  const ruler = document.getElementById('rulerTrack');
-  if (!ruler) return;
-  
-  // Remove existing error markers
-  ruler.querySelectorAll('.timeline-error-marker').forEach(m => m.remove());
+  const lane = document.getElementById('rulerMarkerLane') || document.getElementById('rulerTrack');
+  if (!lane) return;
+  lane.innerHTML = '';
   
   const pxPerSec = PX_PER_SECOND_BASE * zoomFactor;
-  
-  // Group errors by rough timestamp (within 0.5s) to avoid overlapping
-  const placedTimes = [];
-  
   detectedErrors.forEach(err => {
     const isFixed = agentFixedIds.has(err.id) || err.fixed;
     if (isFixed) return;
     
     const timeSec = err.start_us / 1e6;
-    if (placedTimes.some(t => Math.abs(t - timeSec) < 0.4)) return;
-    placedTimes.push(timeSec);
-    
     const leftPx = timeSec * pxPerSec;
     const marker = document.createElement('div');
-    marker.className = `timeline-error-marker severity-${err.severity.toLowerCase()}`;
+    marker.className = 'ruler-error-marker';
     marker.style.left = `${leftPx}px`;
-    marker.title = `${err.title} (${timeSec.toFixed(2)}s) - Bấm để nhảy đến và khoanh vùng`;
-    marker.innerHTML = err.severity === 'CRITICAL' ? '<span class="error-marker-flag critical">▼</span>' : '<span class="error-marker-flag warning">●</span>';
+    marker.title = `${err.title} (${timeSec.toFixed(2)}s)`;
     
     marker.onclick = (e) => {
       e.stopPropagation();
@@ -1619,7 +2155,7 @@ function renderTimelineErrorMarkers() {
       flashBoundingBox(err.id);
     };
     
-    ruler.appendChild(marker);
+    lane.appendChild(marker);
   });
 }
 
@@ -1822,7 +2358,7 @@ async function runAgentAutoPilot() {
 async function runAgentNextStep() {
   const nextErr = detectedErrors.find(e => !agentFixedIds.has(e.id) && !e.fixed);
   if (!nextErr) {
-    alert('Tất cả các vùng lỗi trên timeline đã được xử lý xong!');
+    showToast('Tất cả các vùng lỗi trên timeline đã được xử lý xong!', 'success');
     return;
   }
   
@@ -2016,7 +2552,7 @@ async function triggerParseScriptAI() {
 async function runFootageAnalysisFromInput() {
   const folderPath = document.getElementById('mcpBrollFolder')?.value.trim();
   if (!folderPath) {
-    alert('Vui lòng nhập đường dẫn thư mục Footage');
+    showToast('Vui lòng nhập đường dẫn thư mục Footage', 'warn');
     return;
   }
   
@@ -2185,7 +2721,7 @@ async function triggerMcpCompile() {
   const scriptRaw = document.getElementById('mcpScriptJson')?.value.trim();
   
   if (!projName) {
-    alert('Vui lòng nhập tên dự án');
+    showToast('Vui lòng nhập tên dự án', 'warn');
     return;
   }
   
@@ -2193,7 +2729,7 @@ async function triggerMcpCompile() {
   try {
     scriptSentences = JSON.parse(scriptRaw);
   } catch (err) {
-    alert('Kịch bản JSON không đúng định dạng. Hãy nhấn nút "AI Agent Phân Tích & Căn Nhịp" trước.');
+    showToast('Kịch bản JSON không đúng định dạng. Hãy nhấn nút "AI Agent Phân Tích & Căn Nhịp" trước.', 'error');
     return;
   }
   
