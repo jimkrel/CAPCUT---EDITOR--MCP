@@ -9,279 +9,272 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <!-- TOP APP BAR (48px chuẩn Minimal Professional) -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="capcut-logo" title="CapCut Web Studio">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+<body class="editor-shell">
+  <!-- TOPBAR (58px) CHUẨN DESIGN REVIEW-CAPCUT-EDITOR-MCP-UI -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-7 11-4-2.5 4-2.5v5zm6 0-4-2.5 4-2.5v5z"/>
         </svg>
-      </div>
-      <span class="app-brand-title">CapCut Studio</span>
-      <div class="project-selector">
-        <select id="projectSelect" onchange="loadProject(this.value)" aria-label="Chọn dự án CapCut">
-          <option value="">Đang tải danh sách...</option>
-        </select>
-      </div>
+      </span>
+      <span>CapCut Studio</span>
+      <span class="beta">PRO</span>
     </div>
 
-    <!-- BANNER CẢNH BÁO KHI CAPCUT ĐANG CHẠY -->
-    <div class="capcut-status-banner" id="capcutStatusBanner" style="display: none;" role="alert">
-      <span class="banner-icon">⚠️</span>
-      <span class="banner-text">CapCut Desktop đang mở — Chỉnh sửa draft tạm thời bị khóa</span>
+    <!-- PROJECT SELECTOR WITH GREEN STATUS DOT -->
+    <div class="project-select">
+      <span class="status-dot"></span>
+      <select id="projectSelect" onchange="loadProject(this.value)" aria-label="Chọn dự án CapCut">
+        <option value="">Đang tải danh sách...</option>
+      </select>
     </div>
-    
-    <div class="header-right">
+
+    <!-- BANNER CẢNH BÁO KHI CAPCUT DESKTOP ĐANG CHẠY -->
+    <div class="capcut-status-banner" id="capcutStatusBanner" style="display: none;" role="alert">
+      <span>⚠️ CapCut Desktop đang mở — Chỉnh sửa draft tạm thời bị khóa</span>
+    </div>
+
+    <!-- TOPBAR RIGHT ACTIONS -->
+    <div class="top-actions">
+      <button class="icon-button" id="undoBtn" onclick="undoAction()" aria-label="Hoàn tác (Ctrl+Z)" title="Hoàn tác (Ctrl+Z)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+      </button>
+      <button class="icon-button" id="redoBtn" onclick="redoAction()" aria-label="Làm lại (Ctrl+Shift+Z)" title="Làm lại (Ctrl+Shift+Z)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+      </button>
+      <div class="saved">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+        <span>Đã đồng bộ Draft</span>
+      </div>
+      <button class="help" id="btnHelpShortcuts" onclick="showShortcutsHelp()" title="Phím tắt & Trợ giúp">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Trợ giúp</span>
+      </button>
       <button class="btn-hdr" onclick="openMcpModal()" title="Mở phòng điều khiển MCP 13 Lớp">
-        <span class="btn-hdr-icon">⚡</span> MCP Studio
+        <span>⚡</span> MCP Studio
       </button>
       <button class="btn-hdr" onclick="toggleLiveAgentModal()" title="Mở Cockpit AI Agent Edit Thời Gian Thực">
-        <span class="btn-hdr-icon">🤖</span> AI Agent
+        <span>🤖</span> AI Agent
       </button>
       <button class="btn-hdr btn-hdr-qa" onclick="openQAModal()" title="Kiểm định chất lượng dự án">
         <span class="qa-dot" id="headerQaDot"></span> Lỗi (<span id="headerErrCount">0</span>)
       </button>
-      <button class="btn-hdr btn-hdr-accent" onclick="saveDraftAction()" title="Thay đổi được ghi trực tiếp vào draft CapCut" aria-label="Lưu dự án">
-        <span class="btn-hdr-icon">💾</span> Lưu
-      </button>
+      
+      <!-- EXPORT / SAVE BUTTON NHÃN "LƯU" THEO ACCEPTANCE REQ -->
+      <div class="export-wrap">
+        <button class="export-button" id="btnExportDraft" onclick="saveDraftAction()" title="Thay đổi được ghi trực tiếp vào draft CapCut" aria-label="Lưu dự án">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Lưu</span>
+        </button>
+      </div>
     </div>
   </header>
 
-  <!-- UPPER WORKSPACE: BỐ CỤC 3 CỘT (THƯ VIỆN - PREVIEW - INSPECTOR) CÓ SPLITTER KÉO KÍCH THƯỚC -->
-  <main class="upper-workspace" id="upperWorkspace">
-    <!-- CỘT 1 (TRÁI): THƯ VIỆN & CÔNG CỤ (~300px) -->
-    <section class="panel-assets" id="panelAssets">
-      <div class="asset-tab-bar" role="tablist">
-        <button class="asset-tab active" onclick="switchAssetTab('media', this)" id="tabMediaBtn" title="Footage video" role="tab" aria-selected="true"><span class="tab-icon">📁</span> Footage</button>
-        <button class="asset-tab" onclick="switchAssetTab('text', this)" title="Văn bản & Phụ đề" role="tab"><span class="tab-icon">🔤</span> Chữ</button>
-        <button class="asset-tab" onclick="switchAssetTab('effects', this)" title="Hiệu ứng video" role="tab"><span class="tab-icon">🪄</span> FX</button>
-        <button class="asset-tab" onclick="switchAssetTab('transitions', this)" title="Chuyển tiếp" role="tab"><span class="tab-icon">⚡</span> Chuyển</button>
-        <button class="asset-tab" onclick="switchAssetTab('adjust', this)" title="Điều chỉnh màu sắc" role="tab"><span class="tab-icon">🎚️</span> Chỉnh</button>
-        <button class="asset-tab" onclick="switchAssetTab('scanner', this)" id="tabScannerBtn" title="Quét lỗi footage & timeline" role="tab"><span class="tab-icon">🎯</span> Lỗi <span class="tab-err-badge" id="tabErrBadge">0</span></button>
+  <!-- WORKSPACE: BỐ CỤC 4 CỘT CHUẨN (LEFT RAIL | ASSET PANEL | STAGE PREVIEW | INSPECTOR) -->
+  <main class="workspace" id="upperWorkspace">
+    <!-- CỘT 1: LEFT RAIL (72px) DẢI ĐIỀU HƯỚNG DỌC -->
+    <aside class="left-rail">
+      <button class="rail-item active" id="railMedia" onclick="switchNavRail('media', this)" title="Kho Footage">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 6 4 14H4L8 6Z"/><path d="M12 6V2"/></svg>
+        <span>Thư viện</span>
+      </button>
+      <button class="rail-item" id="railAudio" onclick="switchNavRail('audio', this)" title="Âm thanh & Nhạc nền">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg>
+        <span>Âm thanh</span>
+      </button>
+      <button class="rail-item" id="railText" onclick="switchNavRail('text', this)" title="Văn bản & Phụ đề">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <span>Văn bản</span>
+      </button>
+      <button class="rail-item" id="railEffects" onclick="switchNavRail('effects', this)" title="Hiệu ứng video">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+        <span>Hiệu ứng</span>
+      </button>
+      <button class="rail-item" id="railScanner" onclick="switchNavRail('scanner', this)" title="Quét lọc lỗi footage & timeline">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        <span>Quét lỗi</span>
+        <span class="tab-err-badge" id="tabErrBadge">0</span>
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="rail-item" onclick="openMcpModal()" title="Cài đặt & MCP Studio 13 Lớp">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>MCP</span>
+      </button>
+    </aside>
+
+    <!-- CỘT 2: ASSET PANEL (280px) NỘI DUNG TƯƠNG ỨNG VỚI RAIL -->
+    <section class="asset-panel" id="panelAssets">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Thư viện của bạn</p>
+          <h1 id="assetPanelTitle">Footage & Video</h1>
+        </div>
+        <button class="small-icon" onclick="scanCurrentProjectErrors()" title="Quét kiểm tra toàn bộ lỗi" aria-label="Quét lại lỗi">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
       </div>
-      
-      <div class="asset-tab-content">
-        <!-- TAB 0: FOOTAGE ERROR SCANNER & BOUNDING BOX LIST -->
-        <div class="tab-pane" id="pane-scanner" role="tabpanel">
-          <div class="scanner-header-card">
-            <div class="scanner-top-row">
-              <div class="score-mini-dial" id="scannerScoreDial">85</div>
-              <div class="scanner-status-box">
-                <div class="scanner-status-title" id="scannerStatusTitle">Đang quét footage & timeline...</div>
-                <div class="scanner-sub-stats" id="scannerSubStats">Phát hiện 0 lỗi cần khoanh vùng</div>
-              </div>
+
+      <!-- Ô TÌM KIẾM TÀI NGUYÊN -->
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="assetSearchInput" placeholder="Tìm kiếm tài nguyên..." oninput="filterAssets(this.value)" aria-label="Tìm kiếm tài nguyên">
+      </div>
+
+      <!-- PANE 1: MEDIA & FOOTAGE (MẶC ĐỊNH) -->
+      <div class="asset-tab-pane active" id="pane-media" role="tabpanel">
+        <div class="upload-card">
+          <div class="upload-icon">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div>
+            <strong>Kéo tệp vào đây</strong>
+            <p>hoặc chọn từ máy tính</p>
+          </div>
+          <button class="plus-btn" onclick="showToast('Đã sẵn sàng kéo thả video vào timeline', 'info')" aria-label="Thêm tệp">+</button>
+        </div>
+        <div class="section-label">
+          <span>Đã nhập</span>
+          <span id="mediaCountLabel">0 items</span>
+        </div>
+        <div class="asset-grid" id="mediaGrid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- PANE 2: AUDIO & BGM -->
+      <div class="asset-tab-pane" id="pane-audio" role="tabpanel">
+        <div class="pane-title">Kho Âm Thanh & Nhạc Nền Thương Mại</div>
+        <div class="presets-grid">
+          <button type="button" class="preset-card" onclick="showToast('Đã chọn nhạc nền Commercial Upbeat', 'info')">
+            <div class="p-preview" style="color: #9b8cff;">🎵 Commercial Upbeat 120BPM</div>
+            <div class="p-name">Nhạc nền thương mại sôi động (BGM)</div>
+          </button>
+          <button type="button" class="preset-card" onclick="showToast('Đã chọn SFX Woosh Transition', 'info')">
+            <div class="p-preview" style="color: #65a7ff;">⚡ Whoosh Cinematic SFX</div>
+            <div class="p-name">Hiệu ứng âm thanh chuyển cảnh êm</div>
+          </button>
+          <button type="button" class="preset-card" onclick="showToast('Đã chọn Pop Click SFX', 'info')">
+            <div class="p-preview" style="color: #f59e69;">🔔 Pop Bubble UI Click</div>
+            <div class="p-name">Hiệu ứng pop-up chữ xuất hiện</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- PANE 3: TEXT PRESETS -->
+      <div class="asset-tab-pane" id="pane-text" role="tabpanel">
+        <div class="pane-title">Preset Chữ & Phụ Đề Chuẩn Thương Mại</div>
+        <div class="presets-grid">
+          <button type="button" class="preset-card" onclick="insertTextPreset('HOOK BANNER: CHỈ TỪ 1.100Đ', '#FFE600')">
+            <div class="p-preview" style="color: #FFE600; font-family: 'Montserrat', sans-serif;">CHỈ TỪ 1.100Đ</div>
+            <div class="p-name">Hook Banner Vàng Neon</div>
+          </button>
+          <button type="button" class="preset-card" onclick="insertTextPreset('Montserrat Shadow Commercial', '#FFFFFF')">
+            <div class="p-preview montserrat-shadow">Montserrat Shadow</div>
+            <div class="p-name">Commercial Standard (KB16)</div>
+          </button>
+          <button type="button" class="preset-card" onclick="insertTextPreset('GIẢM GIÁ 50% HÔM NAY', '#FF3B30')">
+            <div class="p-preview" style="color: #FF3B30; font-weight:800;">SALE 50% 🔥</div>
+            <div class="p-name">Flash Sale / FOMO</div>
+          </button>
+          <button type="button" class="preset-card" onclick="insertTextPreset('Hotline / Zalo: 09xx.xxx.xxx', '#00E5FF')">
+            <div class="p-preview" style="color: #00E5FF;">Hotline / Zalo: 09xx...</div>
+            <div class="p-name">Footer Call To Action</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- PANE 4: EFFECTS & FX -->
+      <div class="asset-tab-pane" id="pane-effects" role="tabpanel">
+        <div class="pane-title">Kho Hiệu Ứng Video CapCut</div>
+        <div class="fx-list">
+          <div class="fx-item">
+            <div class="fx-icon">🌫️</div>
+            <div class="fx-info">
+              <div class="fx-name">Mờ (Blur)</div>
+              <div class="fx-meta">Slider: effects_adjust_blur</div>
             </div>
-            <div class="scanner-actions-row">
-              <button class="btn-rescan" onclick="scanCurrentProjectErrors()">🔄 Quét lại ngay</button>
-              <button class="btn-agent-autofix" onclick="startLiveAIAgentEdit()">🤖 AI Agent Sửa Toàn Bộ</button>
+            <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Mờ (Blur)', 'effects_adjust_blur')">Áp dụng</button>
+          </div>
+          <div class="fx-item">
+            <div class="fx-icon">🌀</div>
+            <div class="fx-info">
+              <div class="fx-name">Làm mờ xuyên tâm 2</div>
+              <div class="fx-meta">Sliders: intensity, size, filter</div>
+            </div>
+            <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Làm mờ xuyên tâm 2', 'effects_adjust_intensity')">Áp dụng</button>
+          </div>
+          <div class="fx-item">
+            <div class="fx-icon">✨</div>
+            <div class="fx-info">
+              <div class="fx-name">Phát sáng 2 (Glow)</div>
+              <div class="fx-meta">Sliders: luminance, size</div>
+            </div>
+            <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Phát sáng 2 (Glow)', 'effects_adjust_luminance')">Áp dụng</button>
+          </div>
+          <div class="fx-item">
+            <div class="fx-icon">🌑</div>
+            <div class="fx-info">
+              <div class="fx-name">Tối góc noir (Vignette)</div>
+              <div class="fx-meta">Slider: intensity</div>
+            </div>
+            <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Tối góc noir', 'effects_adjust_intensity')">Áp dụng</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 5: SCANNER LỌC LỖI FOOTAGE -->
+      <div class="asset-tab-pane" id="pane-scanner" role="tabpanel">
+        <div class="scanner-header-card">
+          <div class="scanner-top-row">
+            <div class="score-mini-dial" id="scannerScoreDial">85</div>
+            <div class="scanner-status-box">
+              <div class="scanner-status-title" id="scannerStatusTitle">Đang quét footage & timeline...</div>
+              <div class="scanner-sub-stats" id="scannerSubStats">Phát hiện 0 lỗi cần khoanh vùng</div>
             </div>
           </div>
-
-          <!-- Error Filter Chips -->
-          <div class="error-filter-chips">
-            <button class="err-chip active" data-filter="all" onclick="filterErrorList('all', this)">Tất cả (<b id="filterAllCount">0</b>)</button>
-            <button class="err-chip type-safe" data-filter="safe_zone" onclick="filterErrorList('safe_zone', this)">🛡️ Safe (<b id="filterSafeCount">0</b>)</button>
-            <button class="err-chip type-letterbox" data-filter="framing" onclick="filterErrorList('framing', this)">🔲 Viền (<b id="filterFramingCount">0</b>)</button>
-            <button class="err-chip type-dead" data-filter="pacing" onclick="filterErrorList('pacing', this)">✂️ Đuôi (<b id="filterPacingCount">0</b>)</button>
-            <button class="err-chip type-style" data-filter="typography" onclick="filterErrorList('typography', this)">✨ Font (<b id="filterTypoCount">0</b>)</button>
-          </div>
-
-          <!-- Error Cards Container (Hỗ trợ gộp lỗi accordion) -->
-          <div class="error-items-scroll" id="errorItemsContainer">
-            <div class="scanner-loading-state">
-              <span class="scanner-spinner"></span> Đang quét toàn diện footage và toạ độ an toàn...
-            </div>
+          <div class="scanner-actions-row">
+            <button class="btn-rescan" onclick="scanCurrentProjectErrors()">🔄 Quét lại ngay</button>
+            <button class="btn-agent-autofix" onclick="startLiveAIAgentEdit()">🤖 AI Sửa Toàn Bộ</button>
           </div>
         </div>
 
-        <!-- TAB 1: MEDIA -->
-        <div class="tab-pane active" id="pane-media" role="tabpanel">
-          <div class="media-header">
-            <span class="media-title">Kho Footage & Video Dự Án</span>
-            <button class="btn-sm" onclick="showToast('Đã sẵn sàng kéo thả video vào timeline', 'info')">+ Thêm tệp</button>
-          </div>
-          <div class="media-grid" id="mediaGrid">
-            <!-- Rendered dynamically -->
-          </div>
+        <div class="error-filter-chips">
+          <button class="err-chip active" data-filter="all" onclick="filterErrorList('all', this)">Tất cả (<b id="filterAllCount">0</b>)</button>
+          <button class="err-chip" data-filter="safe_zone" onclick="filterErrorList('safe_zone', this)">🛡️ Safe (<b id="filterSafeCount">0</b>)</button>
+          <button class="err-chip" data-filter="framing" onclick="filterErrorList('framing', this)">🔲 Viền (<b id="filterFramingCount">0</b>)</button>
+          <button class="err-chip" data-filter="pacing" onclick="filterErrorList('pacing', this)">✂️ Đuôi (<b id="filterPacingCount">0</b>)</button>
+          <button class="err-chip" data-filter="typography" onclick="filterErrorList('typography', this)">✨ Font (<b id="filterTypoCount">0</b>)</button>
         </div>
 
-        <!-- TAB 2: TEXT PRESETS -->
-        <div class="tab-pane" id="pane-text" role="tabpanel">
-          <div class="pane-title">Preset Chữ & Phụ Đề Chuẩn Thương Mại</div>
-          <div class="presets-grid">
-            <button type="button" class="preset-card" onclick="insertTextPreset('HOOK BANNER: CHỈ TỪ 1.100Đ', '#FFE600')">
-              <div class="p-preview" style="color: #FFE600; font-family: 'Montserrat', sans-serif;">CHỈ TỪ 1.100Đ</div>
-              <div class="p-name">Hook Banner Vàng Neon</div>
-            </button>
-            <button type="button" class="preset-card" onclick="insertTextPreset('Montserrat Shadow Commercial', '#FFFFFF')">
-              <div class="p-preview montserrat-shadow">Montserrat Shadow</div>
-              <div class="p-name">Commercial Standard (KB16)</div>
-            </button>
-            <button type="button" class="preset-card" onclick="insertTextPreset('GIẢM GIÁ 50% HÔM NAY', '#FF3B30')">
-              <div class="p-preview" style="color: #FF3B30; font-weight:800;">SALE 50% 🔥</div>
-              <div class="p-name">Flash Sale / FOMO</div>
-            </button>
-            <button type="button" class="preset-card" onclick="insertTextPreset('Hotline / Zalo: 09xx.xxx.xxx', '#00E5FF')">
-              <div class="p-preview" style="color: #00E5FF; font-size: 11px;">Hotline / Zalo: 09xx...</div>
-              <div class="p-name">Footer Call To Action</div>
-            </button>
-          </div>
-        </div>
-
-        <!-- TAB 3: VIDEO EFFECTS -->
-        <div class="tab-pane" id="pane-effects" role="tabpanel">
-          <div class="pane-title">Kho Hiệu Ứng Video CapCut</div>
-          <div class="fx-list">
-            <div class="fx-item">
-              <div class="fx-icon">🌫️</div>
-              <div class="fx-info">
-                <div class="fx-name">Mờ (Blur)</div>
-                <div class="fx-meta">Slider: effects_adjust_blur</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Mờ (Blur)', 'effects_adjust_blur')">Áp dụng</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">🌀</div>
-              <div class="fx-info">
-                <div class="fx-name">Làm mờ xuyên tâm 2</div>
-                <div class="fx-meta">Sliders: intensity, size, filter, shift</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Làm mờ xuyên tâm 2', 'effects_adjust_intensity')">Áp dụng</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">✨</div>
-              <div class="fx-info">
-                <div class="fx-name">Phát sáng 2 (Glow)</div>
-                <div class="fx-meta">Sliders: luminance, size</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Phát sáng 2 (Glow)', 'effects_adjust_luminance')">Áp dụng</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">🌑</div>
-              <div class="fx-info">
-                <div class="fx-name">Tối góc noir</div>
-                <div class="fx-meta">Slider: intensity (Vignette)</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Tối góc noir', 'effects_adjust_intensity')">Áp dụng</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">🌌</div>
-              <div class="fx-info">
-                <div class="fx-name">Đêm tối (Dark Night)</div>
-                <div class="fx-meta">Sliders: texture, filter, range</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyEffectToSelected('Đêm tối (Dark Night)', 'effects_adjust_texture')">Áp dụng</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 4: TRANSITIONS -->
-        <div class="tab-pane" id="pane-transitions" role="tabpanel">
-          <div class="pane-title">Kho Chuyển Cảnh (Transitions)</div>
-          <div class="fx-list">
-            <div class="fx-item">
-              <div class="fx-icon">🔀</div>
-              <div class="fx-info">
-                <div class="fx-name">Mờ (Dissolve)</div>
-                <div class="fx-meta">Thời lượng: 0.3s (Chuẩn êm đềm)</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyTransition('Mờ (Dissolve)', 300000)">Chèn</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">⚡</div>
-              <div class="fx-info">
-                <div class="fx-name">Thu phóng nhanh dần (Fast Zoom)</div>
-                <div class="fx-meta">Thời lượng: 0.25s (Đổi góc dồn dập)</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyTransition('Thu phóng nhanh dần (Fast Zoom)', 250000)">Chèn</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">🔆</div>
-              <div class="fx-info">
-                <div class="fx-name">Rò sáng sốt (Light Leak)</div>
-                <div class="fx-meta">Thời lượng: 0.3s (Chớp sáng cinematic)</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyTransition('Rò sáng sốt (Light Leak)', 300000)">Chèn</button>
-            </div>
-            <div class="fx-item">
-              <div class="fx-icon">🫧</div>
-              <div class="fx-info">
-                <div class="fx-name">Bong bóng mờ (Blur Bubble)</div>
-                <div class="fx-meta">Thời lượng: 0.35s</div>
-              </div>
-              <button type="button" class="fx-apply-btn" onclick="applyTransition('Bong bóng mờ', 350000)">Chèn</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 5: ADJUSTMENTS -->
-        <div class="tab-pane" id="pane-adjust" role="tabpanel">
-          <div class="pane-title">Cân Chỉnh Màu & Chi Tiết (15 Sliders Gốc)</div>
-          <div class="adjust-sliders-list">
-            <div class="adj-row">
-              <span class="adj-name">Độ sáng (Brightness)</span>
-              <input type="range" min="-50" max="50" value="0" oninput="handleColorAdjust('brightness', this.value)">
-              <span class="adj-val" id="val-brightness">0</span>
-            </div>
-            <div class="adj-row">
-              <span class="adj-name">Độ tương phản (Contrast)</span>
-              <input type="range" min="-50" max="50" value="0" oninput="handleColorAdjust('contrast', this.value)">
-              <span class="adj-val" id="val-contrast">0</span>
-            </div>
-            <div class="adj-row">
-              <span class="adj-name">Độ bão hòa (Saturation)</span>
-              <input type="range" min="-50" max="50" value="0" oninput="handleColorAdjust('saturation', this.value)">
-              <span class="adj-val" id="val-saturation">0</span>
-            </div>
-            <div class="adj-row">
-              <span class="adj-name">Làm sắc nét (Sharpen)</span>
-              <input type="range" min="0" max="100" value="15" oninput="handleColorAdjust('sharpen', this.value)">
-              <span class="adj-val" id="val-sharpen">15</span>
-            </div>
-            <div class="adj-row">
-              <span class="adj-name">Tối bốn góc (Vignette)</span>
-              <input type="range" min="0" max="100" value="0" oninput="handleColorAdjust('vignetting', this.value)">
-              <span class="adj-val" id="val-vignetting">0</span>
-            </div>
-            <div class="adj-row">
-              <span class="adj-name">Hạt phim (Film Grain)</span>
-              <input type="range" min="0" max="100" value="0" oninput="handleColorAdjust('particle', this.value)">
-              <span class="adj-val" id="val-particle">0</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 6: STICKERS -->
-        <div class="tab-pane" id="pane-stickers" role="tabpanel">
-          <div class="pane-title">Ảnh Vector & Nhãn Dán</div>
-          <div class="presets-grid">
-            <button type="button" class="preset-card" onclick="showToast('Đã sẵn sàng chèn nhãn dán vào timeline', 'info')">
-              <div class="p-preview">🔥 HOT</div>
-              <div class="p-name">Sticker Giảm Giá</button></div>
-            <button type="button" class="preset-card" onclick="showToast('Đã sẵn sàng chèn nhãn dán vào timeline', 'info')">
-              <div class="p-preview">⭐ 5 SAO</div>
-              <div class="p-name">Đánh Giá Uy Tín</button></div>
+        <div class="error-items-scroll" id="errorItemsContainer">
+          <div class="scanner-loading-state">
+            Đang quét toàn diện footage và toạ độ an toàn...
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SPLITTER TRÁI (KÉO KÍCH THƯỚC THƯ VIỆN) -->
-    <div class="panel-splitter" id="splitterLeft" title="Kéo để chỉnh kích thước thư viện"></div>
-
-    <!-- CỘT 2 (GIỮA): TRÌNH PHÁT PREVIEW 9:16 CĂN GIỮA, FIT HEIGHT TO RÕ -->
-    <section class="panel-player" id="panelPlayer">
-      <div class="player-header">
-        <span class="player-title">Trình phát video</span>
-        <div class="player-header-actions">
+    <!-- CỘT 3: STAGE (MÀN HÌNH PREVIEW RẠP PHIM) -->
+    <section class="stage" id="panelPlayer">
+      <div class="stage-toolbar">
+        <div class="crumb">
+          <span id="crumbProjectName">Dự án CapCut</span>
+          <span>/</span>
+          <strong id="crumbCurrentClip">Trình phát video</strong>
+        </div>
+        <div class="stage-tools">
           <span class="player-fps-tag" id="playerFpsTag">30 FPS</span>
+          <button type="button" onclick="toggleSafeGuide()" title="Bật/Tắt hướng dẫn vùng an toàn TikTok">Khung TikTok</button>
+          <button type="button" onclick="toggleBBoxOverlay()" title="Bật/Tắt hiển thị khung khoanh vùng lỗi">Khoanh lỗi</button>
+          <button type="button" onclick="fitPreviewMonitor()" title="Vừa vặn màn hình">Vừa vặn</button>
         </div>
       </div>
-      
-      <div class="player-viewport">
-        <div class="player-canvas" id="playerCanvas">
-          <!-- Real HTML5 Video element for playing footage -->
+
+      <!-- MÀN HÌNH CHÍNH PREVIEW CANVAS -->
+      <div class="preview-wrap">
+        <div class="preview" id="playerCanvas">
+          <!-- Real HTML5 Video element -->
           <video id="mainVideoPlayer" preload="auto" playsinline></video>
           
           <!-- Text Overlays synchronized with playhead -->
@@ -299,133 +292,75 @@
             </div>
           </div>
 
+          <!-- TikTok Safe Guide -->
           <div class="tiktok-safe-guide" id="tiktokSafeGuide">
             <div class="safe-tag">Vùng an toàn TikTok (Lower-Third Safe)</div>
           </div>
+
+          <!-- Góc Timecode Badge trên Canvas -->
+          <div class="preview-time" id="previewTimeBadge">00:00:00</div>
         </div>
       </div>
 
-      <!-- THANH ĐIỀU KHIỂN DƯỚI PREVIEW (CHỨA TIMECODE DUY NHẤT) -->
-      <div class="player-controls">
-        <button class="play-btn" id="playBtn" onclick="togglePlay()" aria-label="Phát hoặc tạm dừng (Space)">▶</button>
-        
-        <!-- TIMECODE DUY NHẤT TRÊN TOÀN GIAO DIỆN -->
-        <div class="timecode-display" title="Thời gian hiện tại / Tổng thời lượng">
+      <!-- TRANSPORT CONTROLS DƯỚI PREVIEW -->
+      <div class="transport">
+        <button class="transport-btn" id="playBtn" onclick="togglePlay()" aria-label="Phát hoặc tạm dừng (Space)">
+          ▶
+        </button>
+        <div class="timecode" title="Thời gian hiện tại / Tổng thời lượng">
           <span id="currentTimecode" class="tc-digits">00:00:00:00</span>
-          <span class="tc-sep">/</span>
+          <em>/</em>
           <span id="totalTimecode" class="tc-digits">00:00:00:00</span>
         </div>
-
-        <div class="transport-switches">
-          <label class="switch-item" title="Bật/Tắt hiển thị khung khoanh vùng lỗi">
-            <input type="checkbox" id="btnToggleBBox" onchange="toggleBBoxOverlay()">
-            <span class="switch-track"></span>
-            <span class="switch-text">Khoanh lỗi</span>
-          </label>
-          <label class="switch-item" title="Bật/Tắt hướng dẫn vùng an toàn TikTok">
-            <input type="checkbox" id="btnToggleSafeGuide" onchange="toggleSafeGuide()">
-            <span class="switch-track"></span>
-            <span class="switch-text">Khung TikTok</span>
-          </label>
-        </div>
+        <div class="transport-spacer"></div>
+        <button class="transport-icon" onclick="splitSelectedAtPlayhead()" title="Cắt clip tại playhead (Ctrl+B)" aria-label="Cắt clip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        </button>
+        <button class="transport-icon" onclick="toggleInspectorFold()" title="Gập/Mở bảng thuộc tính" aria-label="Gập mở thuộc tính">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        </button>
       </div>
     </section>
 
-    <!-- SPLITTER PHẢI (KÉO KÍCH THƯỚC INSPECTOR) -->
-    <div class="panel-splitter" id="splitterRight" title="Kéo để chỉnh kích thước thuộc tính"></div>
-
-    <!-- CỘT 3 (PHẢI): CLIP INSPECTOR & CHI TIẾT DỰ ÁN (~300px, GẬP ĐƯỢC) -->
-    <section class="panel-details" id="panelDetails">
-      <div class="details-tab-header">
-        <div class="dtab-nav">
-          <button class="dtab-btn active" id="tabBtnDetails" onclick="switchDetailTab('project')">Dự Án</button>
-          <button class="dtab-btn" id="tabBtnClip" onclick="switchDetailTab('clip')">Thuộc Tính Clip</button>
-        </div>
-        <button class="btn-fold-inspector" id="btnFoldInspector" onclick="toggleInspectorFold()" title="Gập/Mở bảng thuộc tính">◧</button>
+    <!-- CỘT 4: INSPECTOR (280px) BẢNG THUỘC TÍNH CLIP & THÔNG TIN DỰ ÁN -->
+    <aside class="inspector" id="panelDetails">
+      <div class="inspector-tabs">
+        <button class="selected" id="tabBtnClip" onclick="switchDetailTab('clip')">Thuộc tính Clip</button>
+        <button id="tabBtnDetails" onclick="switchDetailTab('project')">Dự Án</button>
       </div>
 
-      <!-- VIEW A: PROJECT DETAILS & COMPONENT EXPLORER -->
-      <div class="dtab-view active" id="viewProjectDetails">
-        <div class="details-content">
-          <div class="detail-row">
-            <span class="detail-label">Tên dự án:</span>
-            <span class="detail-val" id="detName">--</span>
+      <!-- VIEW A: CLIP INSPECTOR INTERACTIVE -->
+      <div class="inspector-content" id="viewClipInspector">
+        <div class="selection-title">
+          <div class="selection-icon">✦</div>
+          <div>
+            <strong id="inspClipName">Chưa chọn clip</strong>
+            <p id="inspTypeBadge">VIDEO</p>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Đường dẫn:</span>
-            <span class="detail-val path-val" id="detPath" title="Bấm để sao chép" onclick="copyTextToClipboard(this.textContent)">--</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Thời lượng:</span>
-            <span class="detail-val" id="detDuration">--</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">FPS & Màu:</span>
-            <span class="detail-val" id="detFps">--</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Tổng Tracks:</span>
-            <span class="detail-val" id="detTracks">--</span>
-          </div>
+          <span id="inspTimeRange" style="margin-left: auto; font-size: 11px; color: #767f90;">0.00s ➔ 0.00s</span>
+        </div>
 
-          <!-- Component Stats Badges: Gọn 1 hàng -->
-          <div class="comp-stats-pills" id="compStatsPills">
-            <button class="comp-stat-pill" data-type="all">Tất cả <b id="statAllCount">0</b></button>
-            <button class="comp-stat-pill type-video" data-type="video">🎬 <b id="statVideoCount">0</b></button>
-            <button class="comp-stat-pill type-audio" data-type="audio">🎵 <b id="statAudioCount">0</b></button>
-            <button class="comp-stat-pill type-text" data-type="text">🔤 <b id="statTextCount">0</b></button>
-            <button class="comp-stat-pill type-effect" data-type="effect">✨ <b id="statEffectCount">0</b></button>
-            <button class="comp-stat-pill type-sticker" data-type="sticker">🏷️ <b id="statStickerCount">0</b></button>
-          </div>
-
-          <!-- Component Search & Filter -->
-          <div class="comp-search-bar">
-            <input type="text" id="compSearchInput" placeholder="🔍 Tìm kiếm thành phần..." oninput="filterComponentList()">
-          </div>
-
-          <!-- Component Explorer List (Hàng 32px, 1 lớp cuộn duy nhất) -->
-          <div class="comp-explorer-header">
-            <span>Danh sách thành phần</span>
-            <small style="color:var(--text-muted);">(Click để xem)</small>
-          </div>
-          <div class="component-list" id="projectComponentList">
-            <!-- Dynamically populated -->
+        <!-- CANVAS ASPECT SELECTOR -->
+        <div class="inspector-block">
+          <div class="block-title">Khung hình Canvas <span>9:16</span></div>
+          <div class="aspect-grid">
+            <button class="aspect" onclick="setCanvasAspect('16:9', this)">16:9</button>
+            <button class="aspect active" onclick="setCanvasAspect('9:16', this)">9:16</button>
+            <button class="aspect" onclick="setCanvasAspect('1:1', this)">1:1</button>
+            <button class="aspect" onclick="setCanvasAspect('4:5', this)">4:5</button>
           </div>
         </div>
-      </div>
 
-      <!-- VIEW B: INTERACTIVE CLIP INSPECTOR -->
-      <div class="dtab-view" id="viewClipInspector">
-        <div class="clip-inspector-box">
-          <!-- Inspector Header -->
-          <div class="insp-header-row">
-            <span id="inspTypeBadge" class="insp-type-badge badge-video">VIDEO</span>
-            <span id="inspClipName" class="insp-clip-title" title="Tên clip">Tên clip</span>
-          </div>
+        <!-- SUBTITLE TEXT EDITING -->
+        <div class="inspector-block" id="textFieldWrap" style="display: none;">
+          <div class="block-title">Nội dung phụ đề / Chữ</div>
+          <textarea id="inspTextInput" rows="2" class="insp-textarea" oninput="handleLiveTextEdit(this.value)" placeholder="Nhập phụ đề..."></textarea>
+          <div class="insp-subnote">💡 Cập nhật trực tiếp lên màn hình và timeline</div>
+        </div>
 
-          <!-- Track & Index Info -->
-          <div class="insp-meta-row">
-            <span id="inspTrackBadge" class="insp-meta-tag">Track 0</span>
-            <span id="inspTimeRange" class="insp-meta-tag">0.00s ➔ 0.00s</span>
-          </div>
-          
-          <!-- Text Editing Section (for Text clips) -->
-          <div class="insp-field" id="textFieldWrap" style="display: none;">
-            <label for="inspTextInput">Nội dung Phụ đề / Văn bản:</label>
-            <textarea id="inspTextInput" rows="2" class="insp-textarea" oninput="handleLiveTextEdit(this.value)" placeholder="Nhập phụ đề..."></textarea>
-            <div class="insp-subnote">💡 Cập nhật trực tiếp lên màn hình xem trước và timeline</div>
-          </div>
-
-          <!-- Media Path (for Video / Audio) -->
-          <div class="insp-field" id="mediaPathWrap" style="display: none;">
-            <div class="insp-label-flex">
-              <label>Đường dẫn tệp gốc:</label>
-              <button class="btn-copy-mini" type="button" onclick="copyTextToClipboard(document.getElementById('inspMediaPath').textContent)" title="Sao chép đường dẫn">📋 Copy</button>
-            </div>
-            <div class="path-display-box" id="inspMediaPath">--</div>
-          </div>
-
-          <!-- Timing Steppers -->
+        <!-- TIMING STEPPERS -->
+        <div class="inspector-block">
+          <div class="block-title">Thời gian clip</div>
           <div class="insp-row">
             <div class="insp-field">
               <label for="inspStartTime">Bắt đầu (s):</label>
@@ -444,140 +379,163 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Volume Slider (Video / Audio) -->
-          <div class="insp-field" id="volumeFieldWrap">
-            <div class="insp-label-flex">
-              <label for="inspVolumeSlider">Âm lượng Clip:</label>
-              <span id="inspVolumeVal" style="color: var(--color-success); font-weight: 600;">100%</span>
-            </div>
-            <input type="range" id="inspVolumeSlider" min="0" max="200" value="100" class="insp-slider" oninput="handleVolumeChange(this.value)">
+        <!-- VOLUME SLIDER -->
+        <div class="inspector-block" id="volumeFieldWrap">
+          <div class="block-title">Âm lượng clip <span id="inspVolumeVal" style="color: #6ee7b7;">100%</span></div>
+          <input type="range" id="inspVolumeSlider" min="0" max="200" value="100" class="insp-slider" oninput="handleVolumeChange(this.value)">
+        </div>
+
+        <!-- SPEED BUTTONS -->
+        <div class="inspector-block" id="speedFieldWrap">
+          <div class="block-title">Tốc độ phát <span id="inspSpeedVal" style="color: #65a7ff;">1.0x</span></div>
+          <div class="scale-buttons">
+            <button type="button" class="scale-btn" onclick="setClipSpeed(0.5)">0.5x</button>
+            <button type="button" class="scale-btn active" onclick="setClipSpeed(1.0)">1.0x</button>
+            <button type="button" class="scale-btn" onclick="setClipSpeed(1.25)">1.25x</button>
+            <button type="button" class="scale-btn" onclick="setClipSpeed(1.5)">1.5x</button>
+            <button type="button" class="scale-btn" onclick="setClipSpeed(2.0)">2.0x</button>
+          </div>
+        </div>
+
+        <!-- SCALE / PUNCH-IN BUTTONS -->
+        <div class="inspector-block" id="scaleFieldWrap">
+          <div class="block-title">Thu phóng (Punch-in)</div>
+          <div class="scale-buttons">
+            <button type="button" class="scale-btn active" onclick="setClipScale(1.0)">1.0x Chuẩn</button>
+            <button type="button" class="scale-btn" onclick="setClipScale(1.15)">1.15x Punch-in</button>
+            <button type="button" class="scale-btn" onclick="setClipScale(1.2)">1.2x Cận cảnh</button>
+          </div>
+        </div>
+
+        <!-- APPLIED EFFECTS TAGS -->
+        <div class="inspector-block" id="appliedEffectsWrap">
+          <div class="block-title">Hiệu ứng đính kèm</div>
+          <div class="applied-tags-box" id="inspAppliedTags">
+            <span>Không có hiệu ứng đính kèm</span>
+          </div>
+        </div>
+
+        <!-- QUICK ACTIONS BUTTONS -->
+        <div class="insp-actions" id="clipInspActions">
+          <button type="button" class="btn-insp-action" onclick="splitSelectedAtPlayhead()">✂ Cắt đôi</button>
+          <button type="button" class="btn-insp-action" onclick="duplicateSelected()">❐ Nhân đôi</button>
+          <button type="button" class="btn-insp-action btn-ai" onclick="openClipAIPanel()">🪄 AI Lệnh</button>
+          <button type="button" class="btn-insp-action btn-danger" onclick="deleteSelected()">🗑 Xóa Clip</button>
+        </div>
+      </div>
+
+      <!-- VIEW B: PROJECT DETAILS & COMPONENT EXPLORER -->
+      <div class="inspector-content" id="viewProjectDetails" style="display: none;">
+        <div class="details-content">
+          <div class="detail-row">
+            <span>Tên dự án:</span>
+            <span class="detail-val" id="detName">--</span>
+          </div>
+          <div class="detail-row">
+            <span>Đường dẫn:</span>
+            <span class="detail-val path-val" id="detPath" title="Bấm để sao chép" onclick="copyTextToClipboard(this.textContent)">--</span>
+          </div>
+          <div class="detail-row">
+            <span>Thời lượng:</span>
+            <span class="detail-val" id="detDuration">--</span>
+          </div>
+          <div class="detail-row">
+            <span>FPS:</span>
+            <span class="detail-val" id="detFps">--</span>
+          </div>
+          <div class="detail-row">
+            <span>Tổng Tracks:</span>
+            <span class="detail-val" id="detTracks">--</span>
           </div>
 
-          <!-- Speed Controls -->
-          <div class="insp-field" id="speedFieldWrap">
-            <div class="insp-label-flex">
-              <label>Tốc độ phát:</label>
-              <span id="inspSpeedVal" style="color: var(--accent); font-weight: 600;">1.0x</span>
-            </div>
-            <div class="scale-buttons speed-buttons">
-              <button type="button" class="scale-btn" onclick="setClipSpeed(0.5)">0.5x</button>
-              <button type="button" class="scale-btn active" onclick="setClipSpeed(1.0)">1.0x Chuẩn</button>
-              <button type="button" class="scale-btn" onclick="setClipSpeed(1.25)">1.25x</button>
-              <button type="button" class="scale-btn" onclick="setClipSpeed(1.5)">1.5x</button>
-              <button type="button" class="scale-btn" onclick="setClipSpeed(2.0)">2.0x</button>
-            </div>
+          <div class="comp-stats-pills" id="compStatsPills">
+            <button class="comp-stat-pill" data-type="all">Tất cả <b id="statAllCount">0</b></button>
+            <button class="comp-stat-pill" data-type="video">🎬 <b id="statVideoCount">0</b></button>
+            <button class="comp-stat-pill" data-type="audio">🎵 <b id="statAudioCount">0</b></button>
+            <button class="comp-stat-pill" data-type="text">🔤 <b id="statTextCount">0</b></button>
+            <button class="comp-stat-pill" data-type="effect">✨ <b id="statEffectCount">0</b></button>
           </div>
 
-          <!-- Scale / Punch-in Buttons (for Video/Image) -->
-          <div class="insp-field" id="scaleFieldWrap">
-            <label>Tỷ lệ thu phóng (Punch-in / Zoom):</label>
-            <div class="scale-buttons">
-              <button type="button" class="scale-btn active" onclick="setClipScale(1.0)">1.0x Chuẩn</button>
-              <button type="button" class="scale-btn" onclick="setClipScale(1.15)">1.15x Punch-in</button>
-              <button type="button" class="scale-btn" onclick="setClipScale(1.2)">1.2x Cận cảnh</button>
-            </div>
+          <div class="comp-search-bar">
+            <input type="text" id="compSearchInput" placeholder="🔍 Tìm kiếm thành phần..." oninput="filterComponentList()">
           </div>
 
-          <!-- Applied Effects & Animations List -->
-          <div class="insp-field" id="appliedEffectsWrap">
-            <label>Hiệu ứng & Animation đính kèm:</label>
-            <div class="applied-tags-box" id="inspAppliedTags">
-              <span class="no-effect-hint">Không có hiệu ứng đính kèm</span>
-            </div>
-          </div>
-
-          <!-- Pinned Action Buttons for Clip Inspector -->
-          <div class="insp-actions" id="clipInspActions">
-            <button type="button" class="btn-insp-action" onclick="splitSelectedAtPlayhead()">✂ Cắt đôi</button>
-            <button type="button" class="btn-insp-action" onclick="duplicateSelected()">❐ Nhân đôi</button>
-            <button type="button" class="btn-insp-action btn-ai" onclick="openClipAIPanel()">🪄 AI Lệnh</button>
-            <button type="button" class="btn-insp-action btn-danger" onclick="deleteSelected()">🗑 Xóa Clip</button>
+          <div class="component-list" id="projectComponentList">
+            <!-- Dynamically populated -->
           </div>
         </div>
       </div>
-    </section>
+    </aside>
   </main>
 
-  <!-- SPLITTER NGANG ĐIỀU CHỈNH CHIỀU CAO TIMELINE -->
-  <div class="timeline-splitter" id="splitterTimeline" title="Kéo để chỉnh độ cao dòng thời gian"></div>
-
-  <!-- LOWER WORKSPACE: CAPCUT EXACT TIMELINE (GOM NHÓM GỌN GÀNG, BỎ TIMECODE TRÙNG LẶP) -->
-  <footer class="lower-timeline" id="lowerTimeline">
-    <div class="timeline-toolbar">
-      <!-- NHÓM 1: CÔNG CỤ CHỌN / DAO LAM -->
-      <div class="tb-group">
-        <button class="tb-btn active" id="toolSelect" title="Công cụ chọn (V)" aria-label="Công cụ chọn (V)" onclick="setTool('select')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l16 12-7 1 4 7-3 2-4-7-6 5z"/></svg>
-          <span class="tool-hotkey">V</span>
-        </button>
-        <button class="tb-btn" id="toolRazor" title="Công cụ cắt dao lam (B)" aria-label="Công cụ cắt dao lam (B)" onclick="setTool('razor')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-          <span class="tool-hotkey">B</span>
-        </button>
+  <!-- LOWER WORKSPACE: TIMELINE (300px) CHUẨN DESIGN REVIEW-CAPCUT-EDITOR-MCP-UI -->
+  <footer class="timeline" id="lowerTimeline">
+    <!-- TIMELINE TOOLBAR -->
+    <div class="timeline-header">
+      <div class="timeline-label">
+        <span class="eyebrow">Dòng thời gian</span>
+        <strong id="timelineSequenceName">Sequence 01</strong>
+        <button class="tiny-button" title="Thêm track trong CapCut Desktop" aria-label="Thêm track" onclick="addNewTrack()">+</button>
       </div>
 
-      <div class="tb-divider"></div>
+      <div class="timeline-actions">
+        <!-- SELECT & RAZOR TOOLS -->
+        <button class="tb-btn active" id="toolSelect" title="Công cụ chọn (V)" aria-label="Công cụ chọn (V)" onclick="setTool('select')">V</button>
+        <button class="tb-btn" id="toolRazor" title="Công cụ cắt dao lam (B)" aria-label="Công cụ cắt dao lam (B)" onclick="setTool('razor')">B</button>
+        <span class="divider"></span>
 
-      <!-- NHÓM 2: THAO TÁC EDIT (HOÀN TÁC / LÀM LẠI / CẮT / XÓA / NHÂN BẢN) -->
-      <div class="tb-group">
-        <button class="tb-btn" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác (Ctrl+Z)" onclick="undoAction()">↶</button>
-        <button class="tb-btn" title="Làm lại (Ctrl+Shift+Z hoặc Ctrl+Y)" aria-label="Làm lại (Ctrl+Shift+Z hoặc Ctrl+Y)" onclick="redoAction()">↷</button>
-        <button class="tb-btn" title="Tách đôi clip tại Playhead (Ctrl+B)" aria-label="Tách đôi clip tại Playhead (Ctrl+B)" onclick="splitSelectedAtPlayhead()">✂</button>
-        <button class="tb-btn" title="Xóa clip đã chọn (Del/Backspace)" aria-label="Xóa clip đã chọn (Del/Backspace)" onclick="deleteSelected()">🗑</button>
-        <button class="tb-btn" title="Nhân đôi clip (Ctrl+D)" aria-label="Nhân đôi clip (Ctrl+D)" onclick="duplicateSelected()">❐</button>
-      </div>
+        <!-- ACTIONS -->
+        <button class="icon-button" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác" onclick="undoAction()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button class="icon-button" title="Làm lại (Ctrl+Shift+Z)" aria-label="Làm lại" onclick="redoAction()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        </button>
+        <span class="divider"></span>
 
-      <div class="tb-divider"></div>
-
-      <!-- NHÓM 3: SNAP / MAGNET / LINKAGE -->
-      <div class="tb-group">
+        <!-- SNAP & MAGNET -->
         <button class="tb-btn active" id="btnSnapping" title="Tự động bắt dính điểm cắt (S)" onclick="toggleSnapping()">⚡ Bắt dính</button>
         <button class="tb-btn active" id="btnMagnet" title="Hút nam châm trục chính (N)" onclick="toggleMagnet()">🧲 Nam châm</button>
-        <button class="tb-btn" id="btnLinkage" title="Tính năng sắp có" disabled style="opacity: 0.45; cursor: not-allowed;">🔗 Liên kết</button>
-      </div>
+        <span class="divider"></span>
 
-      <!-- NHÓM 4 (PHẢI): THU PHÓNG ZOOM TIMELINE -->
-      <div class="tb-group tb-group-right">
-        <div class="zoom-slider-box">
-          <button class="zoom-btn" onclick="zoomTimelineStep(-0.2)" title="Thu nhỏ timeline">─</button>
-          <input type="range" id="zoomSlider" min="30" max="300" value="100" oninput="handleZoom(this.value)" aria-label="Thu phóng timeline">
-          <button class="zoom-btn" onclick="zoomTimelineStep(0.2)" title="Phóng to timeline">＋</button>
-        </div>
-        <button class="tb-btn" title="Vừa vặn toàn bộ timeline (Shift+Z)" aria-label="Vừa vặn toàn bộ timeline (Shift+Z)" onclick="fitTimeline()">⤢ Fit</button>
+        <!-- ZOOM SLIDER -->
+        <button class="icon-button" onclick="zoomTimelineStep(-0.2)" title="Thu nhỏ timeline" aria-label="Thu nhỏ">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <input type="range" id="zoomSlider" min="30" max="300" value="100" oninput="handleZoom(this.value)" aria-label="Thu phóng timeline">
+        <button class="icon-button" onclick="zoomTimelineStep(0.2)" title="Phóng to timeline" aria-label="Phóng to">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="tb-btn" title="Vừa vặn toàn bộ timeline (Shift+Z)" aria-label="Vừa vặn toàn bộ timeline" onclick="fitTimeline()">Fit</button>
       </div>
     </div>
 
     <!-- KHU VỰC CUỘN TRACKS & THƯỚC ĐO RULER -->
+    <!-- KHU VỰC CUỘN TRACKS & THƯỚC ĐO RULER -->
     <div class="timeline-scroll-container" id="timelineScroll">
-      <!-- TIME RULER & MARKER LANE RIÊNG BIỆT -->
+      <!-- TIME RULER & MARKER LANE -->
       <div class="timeline-ruler" id="timelineRuler">
         <div class="ruler-header-spacer">
           <span class="ruler-header-title">TRACKS</span>
           <button class="btn-add-track-mini" title="Thêm track trong CapCut Desktop" aria-label="Thêm track trong CapCut Desktop" onclick="addNewTrack()">＋</button>
         </div>
         <div class="ruler-content-area">
-          <div class="ruler-track" id="rulerTrack">
-            <!-- Time tick labels -->
-          </div>
-          <!-- LANE MARKER LỖI 6PX NẰM RIÊNG DƯỚI RULER, KHÔNG CHE SỐ -->
+          <div class="ruler-track" id="rulerTrack"></div>
           <div class="ruler-marker-lane" id="rulerMarkerLane"></div>
         </div>
       </div>
 
-      <!-- PLAYHEAD NEEDLE -->
-      <div class="playhead" id="playhead">
-        <div class="playhead-head"></div>
-        <div class="playhead-line"></div>
-      </div>
+      <!-- PLAYHEAD NEEDLE SẮC NÉT VỚI CHÓP KIM CƯƠNG -->
+      <div class="playhead" id="playhead"></div>
 
       <!-- TRACKS ROWS CONTAINER -->
       <div class="tracks-container" id="tracksContainer">
-        <!-- Rendered dynamically from draft_content.json -->
+        <!-- Rendered dynamically -->
       </div>
     </div>
   </footer>
-
 
   <!-- QUALITY GATE AUDIT MODAL -->
   <div class="qa-modal-overlay" id="qaModal" onclick="closeQAModal(event)">
@@ -591,7 +549,7 @@
       
       <div class="qa-score-row">
         <div class="score-dial" id="qaScoreDial">85</div>
-        <div class="score-meta">
+        <div>
           <div class="score-status" id="qaScoreStatus">ĐẠT CHUẨN (PASS)</div>
           <div class="score-sub">Video đạt chuẩn nhịp cắt thương mại và tỷ lệ giữ chân người xem</div>
         </div>
@@ -604,20 +562,14 @@
     </div>
   </div>
 
-  <!-- GEMINI / ANTIGRAVITY AI CO-DIRECTOR POPUP (CLICK & COMMAND) -->
+  <!-- GEMINI / ANTIGRAVITY AI CO-DIRECTOR POPUP -->
   <div class="ai-modal-overlay" id="aiModal" onclick="closeAIPanel(event)">
     <div class="ai-modal-card" role="dialog" aria-modal="true" aria-label="Bảng điều khiển AI Co-Director" onclick="event.stopPropagation()">
       <div class="ai-card-header">
         <div class="ai-title">
-          <span class="ai-sparkle">✦</span> Gemini & Antigravity AI Co-Director
+          <span>✦</span> Gemini & Antigravity AI Co-Director
         </div>
         <button class="btn-close-modal" onclick="closeAIPanel()">✕</button>
-      </div>
-
-      <div class="ai-context-box" id="aiContextBox">
-        <div class="context-item"><strong>🎯 Clip:</strong> <span id="ctxSegName">Chưa chọn clip</span></div>
-        <div class="context-item"><strong>⏱️ Timestamp:</strong> <span id="ctxSegTime">--:--</span></div>
-        <div class="context-item"><strong>📌 Track:</strong> <span id="ctxTrackName">--</span></div>
       </div>
 
       <div class="ai-chips-list">
@@ -625,7 +577,6 @@
         <button type="button" class="chip" onclick="applyQuickPrompt('Đổi font sang Montserrat Regular Bold có Shadow -45 độ chuẩn Commercial')">✨ Chuẩn Montserrat Shadow</button>
         <button type="button" class="chip" onclick="applyQuickPrompt('Áp dụng Punch-in Zoom 1.15x vào clip này')">🔍 Punch-in Zoom 1.15x</button>
         <button type="button" class="chip" onclick="applyQuickPrompt('Kéo toạ độ phụ đề về vùng an toàn TikTok y = -0.404')">🛡️ Vùng an toàn TikTok</button>
-        <button type="button" class="chip" onclick="applyQuickPrompt('Triệt tiêu đuôi video chết, cắt cụt ngay sau khi dứt lời thoại')">✂️ Triệt tiêu đuôi chết</button>
       </div>
 
       <div class="ai-input-wrapper">
@@ -635,8 +586,7 @@
       <div class="ai-card-actions">
         <span class="ai-status-msg" id="aiStatusMsg"></span>
         <button class="btn-ai-execute" onclick="executeAICommand()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Thực thi lệnh trực tiếp
+          <span>⚡</span> Thực thi lệnh trực tiếp
         </button>
       </div>
     </div>
@@ -646,77 +596,18 @@
   <div class="agent-cockpit-overlay" id="liveAgentModal" onclick="closeLiveAgentModal(event)">
     <div class="agent-cockpit-card" role="dialog" aria-modal="true" aria-label="Cockpit AI Agent Edit Thời Gian Thực" onclick="event.stopPropagation()">
       <div class="cockpit-header">
-        <div class="cockpit-title-group">
-          <div class="cockpit-beacon">
-            <span class="beacon-pulse"></span>
-            <span class="beacon-core"></span>
-          </div>
-          <div>
-            <div class="cockpit-main-title">AI AGENT EDIT REALTIME COCKPIT</div>
-            <div class="cockpit-subtitle">Tự động quét footage, khoanh vùng lỗi và biên tập video trực tiếp</div>
-          </div>
+        <div class="cockpit-main-title">
+          <span>🤖</span> AI AGENT EDIT REALTIME COCKPIT
         </div>
-        <div class="cockpit-header-actions">
-          <span class="cockpit-mode-tag" id="agentModeTag">SẴN SÀNG</span>
-          <button class="btn-close-modal" onclick="closeLiveAgentModal()">✕</button>
-        </div>
+        <button class="btn-close-modal" onclick="closeLiveAgentModal()">✕</button>
       </div>
 
-      <!-- Stats Bar -->
-      <div class="cockpit-stats-bar">
-        <div class="cstat-item">
-          <span class="cstat-label">Tổng lỗi phát hiện:</span>
-          <span class="cstat-val cstat-warn" id="cockpitTotalErrors">0</span>
+      <div style="padding: 16px 20px;">
+        <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 14px;">Tự động quét footage, khoanh vùng lỗi và biên tập video trực tiếp.</p>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-agent-autofix" style="padding: 8px 16px;" onclick="runAgentAutoPilot()">▶ Chạy Tự Động (Auto-Pilot)</button>
+          <button class="btn-rescan" style="padding: 8px 16px;" onclick="executeBatchAutoFix()">⚡ Sửa Tất Cả Trong 1 Giây</button>
         </div>
-        <div class="cstat-item">
-          <span class="cstat-label">Đã khoanh vùng & sửa:</span>
-          <span class="cstat-val cstat-success" id="cockpitFixedCount">0</span>
-        </div>
-        <div class="cstat-item">
-          <span class="cstat-label">Chất lượng Timeline:</span>
-          <span class="cstat-val cstat-cyan" id="cockpitHealthScore">85%</span>
-        </div>
-        <div class="cstat-item">
-          <span class="cstat-label">Thời gian biên dịch:</span>
-          <span class="cstat-val" id="cockpitPacingVal">Real-time (0.3s/step)</span>
-        </div>
-      </div>
-
-      <!-- Current Action Spotlight -->
-      <div class="cockpit-spotlight-box">
-        <div class="spotlight-badge" id="spotlightBadge">ĐANG CHỜ LỆNH</div>
-        <div class="spotlight-title" id="spotlightTitle">Chọn "Chạy Tự Động" để AI Agent quét và sửa toàn bộ lỗi trên timeline</div>
-        <div class="spotlight-desc" id="spotlightDesc">AI Agent sẽ tuần tự di chuyển playhead, khoanh vùng lỗi trên video canvas và chốt thông số chuẩn thương mại.</div>
-      </div>
-
-      <!-- Telemetry Stream Console -->
-      <div class="cockpit-terminal">
-        <div class="terminal-bar">
-          <span>LIVE TELEMETRY STREAM & FOOTAGE DIAGNOSTICS</span>
-          <span class="terminal-dots">● ● ●</span>
-        </div>
-        <div class="terminal-body" id="agentTerminalBody">
-          <div class="t-line t-system">[SYSTEM] CapCut AI Agent Co-Director v4.5 initialized. Ready for real-time video editing.</div>
-        </div>
-      </div>
-
-      <!-- Cockpit Control Buttons -->
-      <div class="cockpit-controls-row">
-        <button class="btn-agent-primary" id="btnRunAgentAuto" onclick="runAgentAutoPilot()">
-          <span class="btn-icon">▶</span> Chạy Tự Động (Auto-Pilot)
-        </button>
-        <button class="btn-agent-secondary" onclick="runAgentNextStep()">
-          <span class="btn-icon">⏭</span> Sửa Từng Bước (Step)
-        </button>
-        <button class="btn-agent-secondary" onclick="executeBatchAutoFix()">
-          <span class="btn-icon">⚡</span> Sửa Tất Cả Trong 1 Giây
-        </button>
-        <button class="btn-agent-secondary" onclick="pauseAgent()">
-          <span class="btn-icon">⏸</span> Tạm Dừng
-        </button>
-        <button class="btn-agent-danger" onclick="undoAction()">
-          <span class="btn-icon">↶</span> Hoàn Tác (Undo)
-        </button>
       </div>
     </div>
   </div>
@@ -726,14 +617,13 @@
     <div class="mcp-modal-card" role="dialog" aria-modal="true" aria-label="Phòng điều khiển MCP 13 Lớp" onclick="event.stopPropagation()">
       <div class="mcp-header">
         <div class="mcp-title-box">
-          <span class="mcp-badge">MCP PIPELINE CONNECTED</span>
           <div class="mcp-h1">⚡ MCP Studio & AI Video Producer</div>
-          <div class="mcp-h2">Lọc lỗi footage tự động, phân tích kịch bản theo yêu cầu đạo diễn & biên dịch timeline 13 lớp CapCut</div>
+          <div style="font-size: 11px; color: #858b9b;">Lọc lỗi footage tự động, phân tích kịch bản theo yêu cầu đạo diễn & biên dịch timeline 13 lớp CapCut</div>
         </div>
         <button class="btn-close-modal" onclick="closeMcpModal()">✕</button>
       </div>
 
-      <!-- MCP Studio Internal Navigation Tabs -->
+      <!-- MCP Tabs -->
       <div class="mcp-nav-tabs">
         <button class="mcp-tab-btn active" onclick="switchMcpTab('sources', this)">
           <span>📁</span> Nguồn Footage & Source Bùa
@@ -745,7 +635,7 @@
           <span>🎬</span> Yêu Cầu Đạo Diễn
         </button>
         <button class="mcp-tab-btn" onclick="switchMcpTab('diagnostic', this)" id="mcpTabDiagnosticBtn">
-          <span>🎯</span> Báo Cáo Lọc Lỗi Footage <span class="mcp-tab-badge" id="mcpBadgeBadClips">0</span>
+          <span>🎯</span> Báo Cáo Lọc Lỗi Footage <span class="tab-err-badge" id="mcpBadgeBadClips">0</span>
         </button>
       </div>
 
@@ -754,12 +644,12 @@
         <div class="mcp-pane active" id="mcpPane-sources">
           <div class="mcp-pane-grid">
             <div class="mcp-field">
-              <label>Tên Dự Án (Project Name):</label>
+              <label for="mcpProjectName">Tên Dự Án (Project Name):</label>
               <input type="text" id="mcpProjectName" value="" placeholder="Tên dự án CapCut (ví dụ: DU_AN_MAU)..." class="mcp-input">
             </div>
 
             <div class="mcp-field">
-              <label>Kho Footage Thô B-Roll / A-Roll (Link Folder Path):</label>
+              <label for="mcpBrollFolder">Kho Footage Thô B-Roll / A-Roll (Link Folder Path):</label>
               <div class="mcp-input-row">
                 <input type="text" id="mcpBrollFolder" value="" placeholder="Đường dẫn thư mục footage thô..." class="mcp-input">
                 <button class="mcp-btn-action" type="button" onclick="runFootageAnalysisFromInput()" title="AI Agent quét phân tích toàn bộ footage trong folder">
@@ -769,17 +659,17 @@
             </div>
 
             <div class="mcp-field">
-              <label>Kho "Source Bùa" (BGM, SFX, LUTs, Brand Motion, Overlays):</label>
+              <label for="mcpSupportingFolder">Kho "Source Bùa" (BGM, SFX, LUTs, Brand Motion, Overlays):</label>
               <input type="text" id="mcpSupportingFolder" value="" placeholder="Đường dẫn thư mục tài nguyên hỗ trợ (materials)..." class="mcp-input">
             </div>
 
             <div class="mcp-field">
-              <label>Video VJ / A-Roll Chính:</label>
+              <label for="mcpVjVideo">Video VJ / A-Roll Chính:</label>
               <input type="text" id="mcpVjVideo" value="" placeholder="Đường dẫn file video chính (A-Roll)..." class="mcp-input">
             </div>
 
             <div class="mcp-field">
-              <label>Nhạc Nền BGM (Commercial Ducking):</label>
+              <label for="mcpBgmPath">Nhạc Nền BGM (Commercial Ducking):</label>
               <input type="text" id="mcpBgmPath" value="" placeholder="Đường dẫn file nhạc nền (BGM)..." class="mcp-input">
             </div>
           </div>
@@ -787,144 +677,75 @@
 
         <!-- TAB 2: SCRIPT -->
         <div class="mcp-pane" id="mcpPane-script">
-          <div class="mcp-presets-row">
-            <span>Chọn kịch bản mẫu nhanh:</span>
-            <button class="mcp-preset-pill active" onclick="loadMcpPreset('cup')">🥤 Ly Giấy Sinh Học (4 câu · 10.5s)</button>
-            <button class="mcp-preset-pill" onclick="loadMcpPreset('coffee')">☕ F&B Cà Phê (3 câu · 8.5s)</button>
-            <button class="mcp-preset-pill" onclick="loadMcpPreset('retail')">🛍️ Bán Lẻ Khuyến Mãi (3 câu · 7.5s)</button>
-          </div>
-
           <div class="mcp-field">
-            <div class="mcp-field-header">
-              <label>Điền Kịch Bản Thoại & Phân Cảnh (Plain Text):</label>
-              <button class="mcp-btn-parse" onclick="triggerParseScriptAI()">
-                <span>⚡</span> AI Agent Phân Tích & Căn Nhịp Thoại
-              </button>
-            </div>
-            <textarea id="mcpRawScriptText" rows="5" class="mcp-textarea" placeholder="Nhập kịch bản plain text tiếng Việt. Ví dụ:
-[0.0s - 2.5s] Ly giấy sinh học thế hệ mới, giải pháp xanh thay thế nhựa dùng một lần. (broll: ly_giay)
-[2.5s - 5.0s] Chống thấm nước tuyệt đối, an toàn cho cả đồ uống nóng và lạnh. (broll: chong_tham)
-[5.0s - 7.5s] Thiết kế in ấn logo sắc nét, nâng tầm thương hiệu quán của bạn. (broll: logo_in)
-[7.5s - 10.0s] Đặt hàng ngay hôm nay để nhận ưu đãi chiết khấu đến 20%! (broll: khuyen_mai)">1. Ly giấy sinh học thế hệ mới, giải pháp xanh thay thế hoàn toàn nhựa dùng một lần.
-2. Chống thấm nước tuyệt đối, an toàn cho cả đồ uống nóng và lạnh suốt 12 tiếng.
-3. Thiết kế in ấn logo sắc nét theo yêu cầu, nâng tầm nhận diện thương hiệu quán của bạn.
-4. Nhấp vào giỏ hàng ngay hôm nay để nhận ưu đãi chiết khấu 20% cho 50 đơn đầu tiên!</textarea>
+            <label for="mcpRawScriptText">Điền Kịch Bản Thoại & Phân Cảnh (Plain Text):</label>
+            <textarea id="mcpRawScriptText" rows="5" class="mcp-textarea" placeholder="Nhập kịch bản plain text tiếng Việt..."></textarea>
           </div>
-
-          <div class="mcp-field">
-            <label>Cấu Trúc Phân Cảnh JSON Đã Căn Nhịp (Auto-Generated):</label>
+          <div class="mcp-field" style="margin-top: 10px;">
+            <label for="mcpScriptJson">Cấu Trúc Phân Cảnh JSON Đã Căn Nhịp (Auto-Generated):</label>
             <textarea id="mcpScriptJson" rows="4" class="mcp-textarea-code"></textarea>
           </div>
         </div>
 
-        <!-- TAB 3: DIRECTOR REQUIREMENTS -->
+        <!-- TAB 3: DIRECTOR -->
         <div class="mcp-pane" id="mcpPane-director">
           <div class="mcp-director-grid">
             <div class="mcp-field">
-              <label>🎯 Yêu Cầu Hook 3 Giây Đầu (Giật Tít / Viral Hook):</label>
-              <input type="text" id="mcpDirectorHook" value="CẢNH BÁO: ĐỪNG DÙNG LY NHỰA NỮA!" class="mcp-input" placeholder="Ví dụ: CẢNH BÁO: ĐỪNG MUA NẾU CHƯA XEM HẾT CLIP!">
-              <span class="mcp-input-hint">Gắn vào Track 6 với font Montserrat ExtraBold Vàng Gold pos.y 0.35.</span>
+              <label for="mcpDirectorHook">🎯 Yêu Cầu Hook 3 Giây Đầu:</label>
+              <input type="text" id="mcpDirectorHook" value="CẢNH BÁO: ĐỪNG DÙNG LY NHỰA NỮA!" class="mcp-input">
             </div>
-
             <div class="mcp-field">
-              <label>🚀 Yêu Cầu Kêu Gọi Hành Động (CTA Outro):</label>
-              <input type="text" id="mcpDirectorCta" value="BẤM VÀO GIỎ HÀNG NGAY HÔM NAY" class="mcp-input" placeholder="Ví dụ: NHẤP LINK ĐỂ NHẬN ƯU ĐÃI NGAY">
-              <span class="mcp-input-hint">Gắn vào Track 12 trong 2 giây cuối kèm hiệu ứng backdrop mờ.</span>
-            </div>
-
-            <div class="mcp-field">
-              <label>⏱️ Tiêu Chuẩn Nhịp Dựng (Pacing Mode):</label>
-              <select id="mcpDirectorPacing" class="mcp-select" onchange="onPacingModeChange()">
-                <option value="fast">Dồn Dập / Hook Viral (1.0s - 1.8s/cut - TikTok/Reels)</option>
-                <option value="medium" selected>Cân Bằng Thương Mại Chuẩn (1.8s - 2.8s/cut - Commercial)</option>
-                <option value="cinematic">Chậm Kể Chuyện Cinematic (2.8s - 4.5s/cut - Storytelling)</option>
-              </select>
-            </div>
-
-            <div class="mcp-field">
-              <label>🛡️ Tiêu Chuẩn Kỹ Thuật Đạo Diễn CapCut:</label>
-              <div class="mcp-checks-col">
-                <label class="mcp-check-item">
-                  <input type="checkbox" id="mcpCheckSafeZone" checked>
-                  <span>Khóa TikTok Safe Zone (y = -0.404, không bị đè caption/icon giỏ hàng)</span>
-                </label>
-                <label class="mcp-check-item">
-                  <input type="checkbox" id="mcpCheckDucking" checked>
-                  <span>Tự động Ducking Nhạc Nền BGM (-5dB khi VJ cất tiếng nói)</span>
-                </label>
-                <label class="mcp-check-item">
-                  <input type="checkbox" id="mcpCheckMicBoost" checked>
-                  <span>Boost Mic VJ DJI Voice (+10dB x3.16 chống ồn & nét giọng)</span>
-                </label>
-                <label class="mcp-check-item">
-                  <input type="checkbox" id="mcpCheckMontserrat" checked>
-                  <span>Áp dụng Typography Montserrat Commercial Shadow chuẩn thương mại</span>
-                </label>
-              </div>
+              <label for="mcpDirectorCta">🚀 Yêu Cầu Kêu Gọi Hành Động (CTA Outro):</label>
+              <input type="text" id="mcpDirectorCta" value="BẤM VÀO GIỎ HÀNG NGAY HÔM NAY" class="mcp-input">
             </div>
           </div>
         </div>
 
-        <!-- TAB 4: FOOTAGE DIAGNOSTICS & PROPOSALS -->
+        <!-- TAB 4: DIAGNOSTIC -->
         <div class="mcp-pane" id="mcpPane-diagnostic">
-          <!-- Summary Cards -->
-          <div class="mcp-diag-summary-row">
-            <div class="mcp-diag-stat">
-              <span class="mcp-stat-title">Tổng Clip Đã Quét</span>
-              <span class="mcp-stat-num" id="diagTotalScanned">0</span>
-            </div>
-            <div class="mcp-diag-stat stat-approved">
-              <span class="mcp-stat-title">Đạt Tiêu Chuẩn</span>
-              <span class="mcp-stat-num" id="diagTotalApproved">0</span>
-            </div>
-            <div class="mcp-diag-stat stat-warning">
-              <span class="mcp-stat-title">Cảnh Báo (Warn)</span>
-              <span class="mcp-stat-num" id="diagTotalWarning">0</span>
-            </div>
-            <div class="mcp-diag-stat stat-rejected">
-              <span class="mcp-stat-title">Bị Loại Trừ (Reject)</span>
-              <span class="mcp-stat-num" id="diagTotalRejected">0</span>
-            </div>
-          </div>
-
-          <!-- AI Proposal Box -->
-          <div class="mcp-ai-proposal-box" id="mcpAiProposalBox">
-            <div class="mcp-prop-header">
-              <span class="mcp-prop-icon">🤖</span>
-              <strong>ĐỀ XUẤT ĐẠO DIỄN CỦA AI AGENT:</strong>
-            </div>
-            <div class="mcp-prop-body" id="mcpAiProposalText">
-              Nhấn nút "Quét Lọc Lỗi" ở tab Nguồn Footage hoặc bên dưới để AI Agent chạy OpenCV đo tỷ lệ cháy sáng (overexposed), đo rung lắc camera và mất nét của từng video.
-            </div>
-          </div>
-
-          <!-- Footage Diagnostic Cards Grid -->
-          <div class="mcp-footage-cards-container" id="mcpFootageCardsGrid">
-            <div class="mcp-empty-diag">Chưa có dữ liệu chẩn đoán. Nhấn "Quét Lọc Lỗi Footage" để kích hoạt AI Agent.</div>
-          </div>
+          <div style="font-size: 12px; color: #cbd5e1;">Báo cáo chẩn đoán rung lắc, cháy sáng và mất nét của từng video footage.</div>
+          <div id="mcpFootageCardsGrid" style="margin-top: 12px;"></div>
         </div>
       </div>
 
-      <!-- Realtime Log Terminal -->
-      <div class="mcp-terminal-box">
-        <div class="mcp-term-head">
-          <span>TIẾN TRÌNH AI AGENT & MCP REALTIME STREAM</span>
-          <span id="mcpStatusDot" class="status-dot-active">● READY</span>
-        </div>
-        <div class="mcp-term-body" id="mcpTermBody">
-          <div class="mcp-log-line">[MCP-READY] Server "capcut-commercial-editor" kết nối sẵn sàng qua tiến trình backend.</div>
-        </div>
-      </div>
-
-      <!-- Footer Buttons -->
+      <!-- FOOTER -->
       <div class="mcp-footer">
         <span class="mcp-footer-hint">💡 AI Agent sẽ tự động loại bỏ clip cháy sáng / rung lắc khỏi bể B-Roll khi biên dịch 13 lớp.</span>
         <button class="btn-mcp-compile" id="btnCompileMcp" onclick="triggerMcpCompile()">
-          <span class="btn-icon">🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP
+          <span>🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP
         </button>
       </div>
     </div>
   </div>
+
+  <!-- SHORTCUTS HELP MODAL (A11Y ROLE="DIALOG") -->
+  <div class="shortcuts-modal-overlay" id="shortcutsModal" onclick="closeShortcutsHelp(event)">
+    <div class="shortcuts-modal-card" role="dialog" aria-modal="true" aria-label="Bảng phím tắt & Trợ giúp" onclick="event.stopPropagation()">
+      <div class="shortcuts-header">
+        <div class="shortcuts-title">
+          <span>⌨️</span> Bảng Phím Tắt Thao Tác Nhanh
+        </div>
+        <button class="btn-close-modal" onclick="closeShortcutsHelp()">✕</button>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><span>Phát / Tạm dừng</span><span class="shortcut-key">Space</span></div>
+        <div class="shortcut-row"><span>Hoàn tác</span><span class="shortcut-key">Ctrl + Z</span></div>
+        <div class="shortcut-row"><span>Làm lại</span><span class="shortcut-key">Ctrl + Shift + Z</span></div>
+        <div class="shortcut-row"><span>Tách đôi clip</span><span class="shortcut-key">Ctrl + B</span></div>
+        <div class="shortcut-row"><span>Xóa clip đã chọn</span><span class="shortcut-key">Del / Backspace</span></div>
+        <div class="shortcut-row"><span>Nhân đôi clip</span><span class="shortcut-key">Ctrl + D</span></div>
+        <div class="shortcut-row"><span>Công cụ chọn</span><span class="shortcut-key">V</span></div>
+        <div class="shortcut-row"><span>Công cụ dao lam</span><span class="shortcut-key">B</span></div>
+        <div class="shortcut-row"><span>Bật/Tắt bắt dính</span><span class="shortcut-key">S</span></div>
+        <div class="shortcut-row"><span>Hút nam châm</span><span class="shortcut-key">N</span></div>
+        <div class="shortcut-row"><span>Vừa vặn Timeline</span><span class="shortcut-key">Shift + Z</span></div>
+        <div class="shortcut-row"><span>Lưu trực tiếp Draft</span><span class="shortcut-key">Ctrl + S</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="app.js"></script>
 </body>

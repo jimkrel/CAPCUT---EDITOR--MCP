@@ -347,6 +347,11 @@ async function loadProject(projectName, preserveView = false) {
     const durSec = (projectData.duration_us || 0) / 1000000;
     const durFormatted = formatTimecode(projectData.duration_us || 0);
     
+    const crumbProj = document.getElementById('crumbProjectName');
+    if (crumbProj) crumbProj.textContent = projectData.project_name || 'Dự án CapCut';
+    const tlSeq = document.getElementById('timelineSequenceName');
+    if (tlSeq) tlSeq.textContent = projectData.project_name || 'Sequence 01';
+
     const detName = document.getElementById('detName'); if (detName) detName.textContent = projectData.project_name || '';
     const detPath = document.getElementById('detPath');
     if (detPath) {
@@ -831,6 +836,9 @@ function selectClip(seg, trackIdx, clipEl) {
   
   selectedSegment = { ...seg, trackIndex: trackIdx };
   
+  const crumbClip = document.getElementById('crumbCurrentClip');
+  if (crumbClip && seg) crumbClip.textContent = seg.label || 'Clip';
+
   // Switch Center panel to Clip Inspector
   switchDetailTab('clip');
   updateInspectorFields(seg);
@@ -1101,22 +1109,95 @@ async function setClipScale(scaleVal) {
 }
 
 // 7. Tab Switching (Assets & Details)
-function switchAssetTab(tabId, clickedEl) {
-  document.querySelectorAll('.asset-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+function switchNavRail(tabId, el) {
+  document.querySelectorAll('.rail-item').forEach(r => r.classList.remove('active'));
+  if (el) el.classList.add('active');
   
-  // Support both direct element pass and event.currentTarget fallback
-  const activeEl = clickedEl || (typeof event !== 'undefined' ? event.currentTarget : null);
-  if (activeEl) activeEl.classList.add('active');
+  const titleMap = {
+    'media': 'Footage & Video',
+    'audio': 'Kho Âm Thanh & BGM',
+    'text': 'Văn Bản & Phụ Đề',
+    'effects': 'Kho Hiệu Ứng',
+    'scanner': 'Lọc Lỗi Footage'
+  };
+  const titleEl = document.getElementById('assetPanelTitle');
+  if (titleEl && titleMap[tabId]) titleEl.textContent = titleMap[tabId];
+  
+  document.querySelectorAll('.tab-pane, .asset-tab-pane').forEach(p => p.classList.remove('active'));
   const target = document.getElementById(`pane-${tabId}`);
   if (target) target.classList.add('active');
 }
 
+function switchAssetTab(tabId, clickedEl) {
+  document.querySelectorAll('.asset-tab, .rail-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane, .asset-tab-pane').forEach(p => p.classList.remove('active'));
+  
+  // Support both direct element pass and event.currentTarget fallback
+  const activeEl = clickedEl || (typeof event !== 'undefined' ? event.currentTarget : null);
+  if (activeEl) activeEl.classList.add('active');
+  
+  const target = document.getElementById(`pane-${tabId}`);
+  if (target) target.classList.add('active');
+
+  const railBtn = document.getElementById(`rail${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+  if (railBtn) {
+    document.querySelectorAll('.rail-item').forEach(r => r.classList.remove('active'));
+    railBtn.classList.add('active');
+  }
+}
+
+function setCanvasAspect(aspectRatio, el) {
+  document.querySelectorAll('.aspect').forEach(a => a.classList.remove('active'));
+  if (el) el.classList.add('active');
+  
+  const preview = document.querySelector('.preview');
+  if (preview) {
+    if (aspectRatio === '16:9') {
+      preview.style.aspectRatio = '16/9';
+      preview.style.width = 'min(520px, 80%)';
+    } else if (aspectRatio === '9:16') {
+      preview.style.aspectRatio = '9/16';
+      preview.style.width = 'min(310px, 55%)';
+    } else if (aspectRatio === '1:1') {
+      preview.style.aspectRatio = '1/1';
+      preview.style.width = 'min(380px, 65%)';
+    } else if (aspectRatio === '4:5') {
+      preview.style.aspectRatio = '4/5';
+      preview.style.width = 'min(340px, 60%)';
+    }
+  }
+  showToast(`Đã chuyển tỷ lệ khung hình: ${aspectRatio}`, 'info');
+}
+
+function fitPreviewMonitor() {
+  const preview = document.querySelector('.preview');
+  if (preview) {
+    preview.style.transform = 'none';
+    showToast('Đã căn giữa vừa vặn màn hình xem trước', 'info');
+  }
+}
+
+function showShortcutsHelp() {
+  const modal = document.getElementById('shortcutsModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeShortcutsHelp(e) {
+  if (e && e.target && !e.target.classList.contains('shortcuts-modal-overlay') && !e.target.classList.contains('btn-close-modal')) return;
+  const modal = document.getElementById('shortcutsModal');
+  if (modal) modal.classList.remove('active');
+}
+
 function switchDetailTab(type) {
-  document.getElementById('tabBtnDetails').classList.toggle('active', type === 'project');
-  document.getElementById('tabBtnClip').classList.toggle('active', type === 'clip');
-  document.getElementById('viewProjectDetails').classList.toggle('active', type === 'project');
-  document.getElementById('viewClipInspector').classList.toggle('active', type === 'clip');
+  const tabDet = document.getElementById('tabBtnDetails');
+  const tabClp = document.getElementById('tabBtnClip');
+  if (tabDet) tabDet.classList.toggle('selected', type === 'project');
+  if (tabClp) tabClp.classList.toggle('selected', type === 'clip');
+  
+  const vProj = document.getElementById('viewProjectDetails');
+  const vClip = document.getElementById('viewClipInspector');
+  if (vProj) vProj.style.display = type === 'project' ? 'block' : 'none';
+  if (vClip) vClip.style.display = type === 'clip' ? 'block' : 'none';
 
   if (type === 'clip' && !selectedSegment && projectData && projectData.tracks) {
     for (let tIdx = 0; tIdx < projectData.tracks.length; tIdx++) {
@@ -1167,6 +1248,15 @@ function updatePlayheadPosition(timeUs) {
   const curEl = document.getElementById('currentTimecode');
   if (curEl) curEl.textContent = tcFormatted;
   
+  const previewBadge = document.getElementById('previewTimeBadge');
+  if (previewBadge) {
+    const totalSec = timeUs / 1000000;
+    const m = Math.floor(totalSec / 60);
+    const s = Math.floor(totalSec % 60);
+    const ms = Math.floor((totalSec % 1) * 100);
+    previewBadge.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+  }
+
   const tlCur = document.getElementById('timelineCurTC');
   if (tlCur) tlCur.textContent = tcFormatted;
   
