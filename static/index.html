@@ -599,14 +599,68 @@
         <div class="cockpit-main-title">
           <span>🤖</span> AI AGENT EDIT REALTIME COCKPIT
         </div>
-        <button class="btn-close-modal" onclick="closeLiveAgentModal()">✕</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="cockpit-mode-tag" id="agentModeTag">SẴN SÀNG</span>
+          <button class="btn-close-modal" onclick="closeLiveAgentModal()">✕</button>
+        </div>
       </div>
 
-      <div style="padding: 16px 20px;">
-        <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 14px;">Tự động quét footage, khoanh vùng lỗi và biên tập video trực tiếp.</p>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn-agent-autofix" style="padding: 8px 16px;" onclick="runAgentAutoPilot()">▶ Chạy Tự Động (Auto-Pilot)</button>
-          <button class="btn-rescan" style="padding: 8px 16px;" onclick="executeBatchAutoFix()">⚡ Sửa Tất Cả Trong 1 Giây</button>
+      <div class="cockpit-body">
+        <!-- Stats Bar -->
+        <div class="cockpit-stats-bar">
+          <div class="cstat-item">
+            <span class="cstat-label">Tổng lỗi phát hiện:</span>
+            <span class="cstat-val cstat-warn" id="cockpitTotalErrors">0</span>
+          </div>
+          <div class="cstat-item">
+            <span class="cstat-label">Đã sửa:</span>
+            <span class="cstat-val cstat-success" id="cockpitFixedCount">0</span>
+          </div>
+          <div class="cstat-item">
+            <span class="cstat-label">Điểm chất lượng:</span>
+            <span class="cstat-val cstat-cyan" id="cockpitHealthScore">85%</span>
+          </div>
+          <div class="cstat-item">
+            <span class="cstat-label">Thời gian biên dịch:</span>
+            <span class="cstat-val" id="cockpitPacingVal">Real-time</span>
+          </div>
+        </div>
+
+        <!-- Spotlight Box -->
+        <div class="cockpit-spotlight-box">
+          <div class="spotlight-badge" id="spotlightBadge">ĐANG CHỜ LỆNH</div>
+          <div class="spotlight-title" id="spotlightTitle">Chọn "Chạy Tự Động" để AI Agent quét và sửa toàn bộ lỗi trên timeline</div>
+          <div class="spotlight-desc" id="spotlightDesc">AI Agent sẽ tuần tự di chuyển playhead, khoanh vùng lỗi trên video canvas và chốt thông số chuẩn thương mại.</div>
+        </div>
+
+        <!-- Telemetry Terminal -->
+        <div class="cockpit-terminal">
+          <div class="terminal-bar">
+            <span>LIVE TELEMETRY STREAM & FOOTAGE DIAGNOSTICS</span>
+            <span class="terminal-dots">● ● ●</span>
+          </div>
+          <div class="terminal-body" id="agentTerminalBody">
+            <div class="t-line t-system">[SYSTEM] CapCut AI Agent Co-Director initialized. Sẵn sàng tự động biên tập.</div>
+          </div>
+        </div>
+
+        <!-- Cockpit Controls Row -->
+        <div class="cockpit-controls-row">
+          <button class="btn-agent-primary" id="btnRunAgentAuto" onclick="runAgentAutoPilot()">
+            <span class="btn-icon">▶</span> Chạy Tự Động (Auto-Pilot)
+          </button>
+          <button class="btn-agent-secondary" onclick="runAgentNextStep()">
+            <span class="btn-icon">⏭</span> Sửa Từng Bước (Step)
+          </button>
+          <button class="btn-agent-secondary" onclick="executeBatchAutoFix()">
+            <span class="btn-icon">⚡</span> Sửa Tất Cả Trong 1 Giây
+          </button>
+          <button class="btn-agent-secondary" onclick="pauseAgent()">
+            <span class="btn-icon">⏸</span> Tạm Dừng
+          </button>
+          <button class="btn-agent-danger" onclick="undoAction()">
+            <span class="btn-icon">↶</span> Hoàn Tác
+          </button>
         </div>
       </div>
     </div>

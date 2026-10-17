@@ -1179,13 +1179,13 @@ function fitPreviewMonitor() {
 
 function showShortcutsHelp() {
   const modal = document.getElementById('shortcutsModal');
-  if (modal) modal.classList.add('active');
+  if (modal) modal.classList.add('open', 'active');
 }
 
 function closeShortcutsHelp(e) {
   if (e && e.target && !e.target.classList.contains('shortcuts-modal-overlay') && !e.target.classList.contains('btn-close-modal')) return;
   const modal = document.getElementById('shortcutsModal');
-  if (modal) modal.classList.remove('active');
+  if (modal) modal.classList.remove('open', 'active');
 }
 
 function switchDetailTab(type) {
@@ -1691,7 +1691,7 @@ async function duplicateSelected() {
 // 10. Quality Gate Audit Modal
 async function openQAModal() {
   const modal = document.getElementById('qaModal');
-  modal.classList.add('open');
+  modal.classList.add('open', 'active');
   trapModalFocus(modal);
   
   try {
@@ -1734,7 +1734,8 @@ async function openQAModal() {
 
 function closeQAModal(e) {
   // Allow calling from overlay click OR directly
-  document.getElementById('qaModal').classList.remove('open');
+  const modal = document.getElementById('qaModal');
+  if (modal) modal.classList.remove('open', 'active');
   releaseModalFocus();
 }
 
@@ -1781,7 +1782,12 @@ function renderMediaTab() {
   const grid = document.getElementById('mediaGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  if (!projectData) return;
+  
+  const countLabel = document.getElementById('mediaCountLabel');
+  if (!projectData) {
+    if (countLabel) countLabel.textContent = '0 items';
+    return;
+  }
   
   let mediaFound = 0;
   projectData.tracks.forEach((t, tIdx) => {
@@ -1822,6 +1828,10 @@ function renderMediaTab() {
     });
   });
   
+  if (countLabel) {
+    countLabel.textContent = `${mediaFound} items`;
+  }
+  
   if (mediaFound === 0) {
     grid.innerHTML = `
       <div class="empty-media-box">
@@ -1836,7 +1846,7 @@ function renderMediaTab() {
 // 12. AI Modal & Execution
 function openAIPanel() {
   const modal = document.getElementById('aiModal');
-  modal.classList.add('open');
+  modal.classList.add('open', 'active');
   trapModalFocus(modal);
   const segName = selectedSegment ? selectedSegment.label : 'Toàn bộ Timeline';
   const segTime = selectedSegment ? `${(selectedSegment.start_us/1e6).toFixed(2)}s ➔ ${(selectedSegment.end_us/1e6).toFixed(2)}s` : '00:00 - Hết';
@@ -1849,7 +1859,8 @@ function openAIPanel() {
 }
 
 function closeAIPanel() {
-  document.getElementById('aiModal').classList.remove('open');
+  const modal = document.getElementById('aiModal');
+  if (modal) modal.classList.remove('open', 'active');
   releaseModalFocus();
 }
 
@@ -2460,17 +2471,18 @@ async function executeSingleAutoFix(errorId) {
 // 18. AI AGENT REALTIME AUTONOMOUS DIRECTOR ENGINE
 function toggleLiveAgentModal() {
   const modal = document.getElementById('liveAgentModal');
-  if (modal.classList.contains('open')) {
+  if (modal.classList.contains('open') || modal.classList.contains('active')) {
     closeLiveAgentModal();
   } else {
-    modal.classList.add('open');
+    modal.classList.add('open', 'active');
     trapModalFocus(modal);
     scanCurrentProjectErrors();
   }
 }
 
 function closeLiveAgentModal() {
-  document.getElementById('liveAgentModal').classList.remove('open');
+  const modal = document.getElementById('liveAgentModal');
+  if (modal) modal.classList.remove('open', 'active');
   pauseAgent();
   releaseModalFocus();
 }
