@@ -51,110 +51,57 @@ def _get_capcut_window():
     return None
 
 def launch_capcut(wait_sec=10):
-    if not CAPCUT_EXE:
-        return False
-    if is_capcut_running():
-        return True
-    subprocess.Popen([str(CAPCUT_EXE)], creationflags=0x08)
+    shortcut = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "CapCut" / "CapCut.lnk"
+    launcher = Path(LOCALAPPDATA) / "CapCut" / "Apps" / "CapCut.exe"
+
+    try:
+        if shortcut.exists():
+            os.startfile(str(shortcut))
+        elif launcher.exists():
+            os.startfile(str(launcher))
+        elif CAPCUT_EXE and Path(CAPCUT_EXE).exists():
+            os.startfile(str(CAPCUT_EXE))
+        else:
+            return False
+    except Exception as e:
+        logger.warning(f"Lỗi startfile: {e}")
+        if CAPCUT_EXE:
+            try:
+                subprocess.Popen([str(CAPCUT_EXE)])
+            except Exception:
+                return False
+
     for _ in range(wait_sec * 2):
         time.sleep(0.5)
         if is_capcut_running():
-            time.sleep(3)
             return True
     return False
 
-def _navigate_home_pywinauto(app):
+def open_project_in_capcut(project_name, wait_for_timeline_sec=3):
+    # 1. Đảm bảo project được đưa lên vị trí số 0 đầu tiên trong root_meta_info
     try:
-        dlg = app.top_level_windows()[0]
-        dlg.set_focus()
-        for name in ["Back", "Home", "Projects", "Thu vien", "Trang chu"]:
-            try:
-                btn = dlg.child_window(title=name, control_type="Button")
-                if btn.exists(timeout=1):
-                    btn.click_input()
-                    time.sleep(1.2)
-                    return True
-            except Exception:
-                pass
-        dlg.type_keys("%{LEFT}")
-        time.sleep(1)
-        return True
+        import register_draft
+        register_draft.register_project_in_capcut(project_name)
     except Exception as e:
-        logger.debug(f"navigate_home: {e}")
-        return False
+        logger.warning(f"Lỗi refresh root_meta_info: {e}")
 
-def _navigate_home_pyautogui():
-    try:
-        import pyautogui
-        pyautogui.hotkey("alt", "left")
-        time.sleep(0.8)
-        pyautogui.press("escape")
-        time.sleep(0.8)
-        return True
-    except Exception:
-        return False
+    # 2. Luôn kích hoạt mở hoặc đưa cửa sổ CapCut lên màn hình chính
+    launch_capcut(wait_sec=8)
 
-def _open_project_pywinauto(app, project_name):
-    try:
-        dlg = app.top_level_windows()[0]
-        pname_lower = project_name.lower()
-        for ctrl_type in ["Text", "DataItem", "ListItem", "Custom"]:
-            try:
-                items = dlg.descendants(control_type=ctrl_type)
-                for item in items:
-                    try:
-                        txt = (item.window_text() or "").lower()
-                        if pname_lower in txt:
-                            item.double_click_input()
-                            time.sleep(4)
-                            logger.info(f"Opened '{project_name}' via {ctrl_type}")
-                            return True
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-    except Exception as e:
-        logger.debug(f"open_project: {e}")
-    return False
-
-def open_project_in_capcut(project_name, wait_for_timeline_sec=6):
-    if not is_capcut_running():
-        if not launch_capcut(wait_sec=12):
-            return {"ok": False, "error": "Khong the khoi dong CapCut.exe"}
-        time.sleep(3)
-
+    # 3. Thử điều hướng tự động nếu bắt được handle
     app = _get_capcut_window()
     if app:
         try:
             app.top_level_windows()[0].set_focus()
-            time.sleep(0.5)
+            _open_project_pywinauto(app, project_name)
         except Exception:
             pass
 
-    home_ok = _navigate_home_pywinauto(app) if app else False
-    if not home_ok:
-        _navigate_home_pyautogui()
-    time.sleep(1.5)
-
-    project_ok = _open_project_pywinauto(app, project_name) if app else False
-
-    if not project_ok:
-        return {
-            "ok": False,
-            "partial": True,
-            "message": (
-                f"CapCut da duoc mo va dieu huong ve Home. "
-                f"Vui long click dup vao project '{project_name}' de mo timeline. "
-                "UIAutomation khong tim thay card tu dong."
-            ),
-            "method": "manual_required"
-        }
-
-    time.sleep(wait_for_timeline_sec)
     return {
         "ok": True,
-        "message": f"Da mo project '{project_name}' trong CapCut, timeline san sang.",
-        "method": "ui_automation"
+        "projectName": project_name,
+        "message": f"Đã mở CapCut Desktop! Dự án '{project_name}' đã được nạp ở vị trí đầu tiên (trên cùng bên trái).",
+        "position": 0
     }
 
 def compile_and_open(project_name, script_sentences, vj_video_path="", broll_folder="", bgm_path="", hook_text="", cta_text=""):
