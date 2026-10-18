@@ -394,8 +394,22 @@ def parse_commercial_script(raw_text: str, pacing_mode: str = "medium") -> List[
     lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
     sentences = []
     
-    # Tốc độ đọc: Fast ~ 1.5s/câu, Medium ~ 2.5s/câu, Slow ~ 3.5s/câu
-    min_dur = 1.3 if pacing_mode == "fast" else (2.0 if pacing_mode == "medium" else 2.8)
+    # Tốc độ đọc: Hỗ trợ cả preset ("fast", "medium", "slow") và số giây điền tự do ("1.5s", "2.8", "3.0")
+    min_dur = 2.0
+    p_str = str(pacing_mode).strip().lower() if pacing_mode else "medium"
+    if p_str == "fast":
+        min_dur = 1.3
+    elif p_str == "medium":
+        min_dur = 2.0
+    elif p_str == "slow":
+        min_dur = 2.8
+    else:
+        m_num = re.search(r'(\d+(\.\d+)?)', p_str)
+        if m_num:
+            try:
+                min_dur = max(0.5, min(15.0, float(m_num.group(1))))
+            except Exception:
+                min_dur = 2.0
     curr_time = 0.0
 
     for idx, line in enumerate(lines):

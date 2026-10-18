@@ -408,6 +408,13 @@ async function fetchProjects() {
       if (p.name === currentProject) opt.selected = true;
       select.appendChild(opt);
     });
+
+    landingProjectsCache = projects;
+    if (typeof renderLandingProjects === 'function') {
+      renderLandingProjects(projects);
+      const countSpan = document.getElementById('lpProjectsCount');
+      if (countSpan) countSpan.textContent = `(${projects.length} dự án)`;
+    }
   } catch (err) {
     console.error('Failed to fetch projects:', err);
     showToast('Lỗi kết nối máy chủ CapCut Web Studio', 'error');
@@ -500,6 +507,27 @@ async function loadProject(projectName, preserveView = false) {
     renderRuler(durSec);
     renderTracks();
     renderMediaTab();
+
+    // Auto-sync Studio Color Filter từ Track 7 (Adjustment Layer)
+    const hasAdjustTrack = (projectData.tracks || []).some(t => t.type === 'adjust' && (t.segments || []).length > 0);
+    if (hasAdjustTrack) {
+      studioColorFilters.brightness = 7;
+      studioColorFilters.contrast = 14;
+      studioColorFilters.saturation = 10;
+      applyStudioCombinedFilter();
+      const bEl = document.getElementById('val-brightness'); if (bEl) bEl.textContent = '7';
+      const cEl = document.getElementById('val-contrast'); if (cEl) cEl.textContent = '14';
+      const sEl = document.getElementById('val-saturation'); if (sEl) sEl.textContent = '10';
+      const bSl = document.getElementById('slider-brightness'); if (bSl) bSl.value = 7;
+      const cSl = document.getElementById('slider-contrast'); if (cSl) cSl.value = 14;
+      const sSl = document.getElementById('slider-saturation'); if (sSl) sSl.value = 10;
+    } else {
+      studioColorFilters.brightness = 0;
+      studioColorFilters.contrast = 0;
+      studioColorFilters.saturation = 0;
+      applyStudioCombinedFilter();
+    }
+
     updatePlayheadPosition(currentPlayheadUs);
     
     if (preserveView && timelineScroll) {
@@ -1921,12 +1949,27 @@ async function applyTransition(transName, durUs) {
   await executeAICommand();
 }
 
-function handleColorAdjust(type, val) {
-  document.getElementById(`val-${type}`).textContent = val;
+const studioColorFilters = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0
+};
+
+function applyStudioCombinedFilter() {
   const canvas = document.getElementById('playerCanvas');
-  if (type === 'brightness') canvas.style.filter = `brightness(${1 + val/100})`;
-  else if (type === 'contrast') canvas.style.filter = `contrast(${1 + val/100})`;
-  else if (type === 'saturation') canvas.style.filter = `saturate(${1 + val/100})`;
+  if (!canvas) return;
+  const b = 1 + (studioColorFilters.brightness / 100);
+  const c = 1 + (studioColorFilters.contrast / 100);
+  const s = 1 + (studioColorFilters.saturation / 100);
+  canvas.style.filter = `brightness(${b}) contrast(${c}) saturate(${s})`;
+}
+
+function handleColorAdjust(type, val) {
+  const num = parseFloat(val) || 0;
+  const valEl = document.getElementById(`val-${type}`);
+  if (valEl) valEl.textContent = num;
+  studioColorFilters[type] = num;
+  applyStudioCombinedFilter();
 }
 
 // Render media thumbnails hiện đại chuẩn Studio
@@ -3236,6 +3279,25 @@ async function triggerMcpCompile() {
       
       await loadProject(result.projectName);
       
+      // Auto-open CapCut Desktop if checked
+      const chkAutoOpen = document.getElementById('chkAutoOpenCapcut');
+      if (chkAutoOpen && chkAutoOpen.checked) {
+        logMcpTerminal(`[CAPCUT-DESKTOP] 🎬 Đang tự động kết nối & nạp Timeline CapCut Desktop...`);
+        fetch('/api/capcut/open-project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName: result.projectName })
+        }).then(r => r.json()).then(openRes => {
+          if (openRes.ok) {
+            logMcpTerminal(`[CAPCUT-DESKTOP] ✓ Đã mở "${result.projectName}" trên CapCut Desktop thành công!`);
+          } else {
+            logMcpTerminal(`[CAPCUT-DESKTOP] ℹ ${openRes.message || openRes.error || 'Đã nạp CapCut.'}`);
+          }
+        }).catch(err => {
+          logMcpTerminal(`[CAPCUT-DESKTOP] Lưu ý: ${err.message}`);
+        });
+      }
+
       setTimeout(() => {
         closeMcpModal();
         btn.disabled = false;
@@ -3252,6 +3314,512 @@ async function triggerMcpCompile() {
     btn.innerHTML = '<span class="btn-icon">🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP';
   }
 }
+
+/**
+ * Mở trực tiếp dự án đang chọn lên CapCut Desktop (Tự động nạp Timeline, không cần đóng/mở lại app)
+ */
+async function openCurrentProjectInCapcut() {
+  const proj = currentProject;
+  if (!proj) {
+    alert("Vui lòng chọn hoặc biên dịch một dự án CapCut trước.");
+    return;
+  }
+  const btn = document.getElementById('btnOpenInCapcut');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="scanner-spinner" style="width:12px;height:12px;margin-right:6px;display:inline-block;vertical-align:middle;"></span> Đang nạp CapCut...';
+  }
+  try {
+    const res = await fetch('/api/capcut/open-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectName: proj })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert(`✓ Đã nạp thành công dự án "${proj}" vào Timeline CapCut Desktop!`);
+    } else {
+      alert(data.message || data.error || `CapCut đã được mở. Vui lòng bấm vào project "${proj}".`);
+    }
+  } catch (err) {
+    alert(`Lỗi khi mở CapCut: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+}
+
+// ==========================================================================
+// LANDING PAGE CONTROLLER (MỞ DỰ ÁN TỪ MÁY & KHỞI TẠO 13 LỚP MCP)
+// ==========================================================================
+let landingProjectsCache = [];
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function openLandingPage(tab = 'open') {
+  const overlay = document.getElementById('landingPageOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  switchLandingTab(tab);
+  loadLandingProjects();
+}
+
+function closeLandingPage() {
+  const overlay = document.getElementById('landingPageOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  // Nếu chưa có project nào được chọn và có danh sách, nạp ngay project đầu tiên
+  if (!currentProject && landingProjectsCache.length > 0) {
+    selectLandingProject(landingProjectsCache[0].name);
+  }
+}
+
+function switchLandingTab(tab) {
+  const tabOpen = document.getElementById('tabLpOpen');
+  const tabCreate = document.getElementById('tabLpCreate');
+  const paneOpen = document.getElementById('lpPaneOpen');
+  const paneCreate = document.getElementById('lpPaneCreate');
+  
+  if (tab === 'create') {
+    tabOpen?.classList.remove('active');
+    tabCreate?.classList.add('active');
+    paneOpen?.classList.remove('active');
+    paneCreate?.classList.add('active');
+    
+    // Tự sinh tên dự án mặc định nếu chưa có
+    const nameInput = document.getElementById('lpProjectName');
+    if (nameInput && !nameInput.value) {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      nameInput.value = `AUTO_COMMERCIAL_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    }
+    // Tự động nạp mẫu kịch bản nếu textarea đang trống
+    const scriptBox = document.getElementById('lpRawScriptText');
+    if (scriptBox && !scriptBox.value) {
+      fillLpSampleScript('fb');
+    }
+    // Đồng bộ đường dẫn từ MCP modal nếu có
+    const mcpBroll = document.getElementById('mcpBrollFolder')?.value;
+    const lpBroll = document.getElementById('lpBrollFolder');
+    if (mcpBroll && lpBroll && !lpBroll.value) {
+      lpBroll.value = mcpBroll;
+    }
+  } else {
+    tabCreate?.classList.remove('active');
+    tabOpen?.classList.add('active');
+    paneCreate?.classList.remove('active');
+    paneOpen?.classList.add('active');
+  }
+}
+
+async function loadLandingProjects(forceRefresh = false) {
+  const countSpan = document.getElementById('lpProjectsCount');
+  const statusPill = document.getElementById('lpCapcutStatusText');
+  try {
+    const res = await fetch('/api/projects');
+    if (!res.ok) throw new Error('Không thể tải danh sách dự án');
+    const data = await res.json();
+    landingProjectsCache = data.projects || [];
+    if (countSpan) countSpan.textContent = `(${landingProjectsCache.length} dự án)`;
+    if (statusPill) {
+      statusPill.textContent = data.capcut_running ? 'CapCut Desktop: Đang chạy' : 'CapCut Desktop: Sẵn sàng';
+    }
+    renderLandingProjects(landingProjectsCache);
+  } catch (err) {
+    if (countSpan) countSpan.textContent = `(Lỗi tải)`;
+    console.error('Lỗi tải danh sách dự án Landing Page:', err);
+    const grid = document.getElementById('lpProjectsGrid');
+    if (grid) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; padding: 30px; text-align: center; color: #f43f5e; background: rgba(244,63,94,0.1); border-radius: 10px;">
+          <div>⚠️ Không thể kết nối đến máy chủ: ${escapeHtml(err.message)}</div>
+          <button class="lp-btn-action" style="margin: 12px auto 0;" onclick="loadLandingProjects(true)">🔄 Thử lại</button>
+        </div>
+      `;
+    }
+  }
+}
+
+function renderLandingProjects(projects) {
+  const grid = document.getElementById('lpProjectsGrid');
+  if (!grid) return;
+  if (!projects || projects.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 48px 24px; text-align: center; color: #64748b; background: #131722; border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+        <div style="font-size: 36px; margin-bottom: 10px;">📂</div>
+        <div style="font-size: 15px; font-weight: 700; color: #f1f5f9;">Chưa có dự án nào trong CapCut</div>
+        <div style="font-size: 12.5px; color: #94a3b8; margin: 6px 0 16px;">Bạn có thể nhập thư mục dự án từ máy tính hoặc bấm "Tạo Dự Án Mới" để AI tự động dựng 13 lớp!</div>
+        <button class="lp-btn-primary" style="margin: 0 auto;" onclick="switchLandingTab('create')">
+          <span>✨</span> Tạo Dự Án Mới Ngay
+        </button>
+      </div>
+    `;
+    return;
+  }
+  
+  grid.innerHTML = projects.map(p => {
+    const dateStr = p.modified ? new Date(p.modified * 1000).toLocaleString('vi-VN') : 'Không rõ';
+    const isCurrent = p.name === currentProject;
+    const dur = p.duration_sec ? `${p.duration_sec}s` : '0s';
+    const clips = p.video_count !== undefined ? `${p.video_count} clip` : '0 clip';
+    const texts = p.text_count !== undefined ? `${p.text_count} sub` : '0 sub';
+    const safeName = escapeHtml(p.name);
+    
+    return `
+      <div class="lp-project-card ${isCurrent ? 'active-border' : ''}">
+        <div class="lp-card-head">
+          <div class="lp-card-icon">🎬</div>
+          <div class="lp-card-meta">
+            <div class="lp-card-title" title="${safeName}">${safeName}</div>
+            <div class="lp-card-date">🕒 Cập nhật: ${dateStr}</div>
+          </div>
+        </div>
+        <div class="lp-card-stats">
+          <div class="lp-stat-badge">⏱️ ${dur}</div>
+          <div class="lp-stat-badge">🎞️ ${clips}</div>
+          <div class="lp-stat-badge">💬 ${texts}</div>
+        </div>
+        <div class="lp-card-actions">
+          <button class="btn-lp-card-open" type="button" onclick="selectLandingProject('${safeName}')" title="Mở dự án này vào Web Studio Editor">
+            <span>🎨</span> Mở Vào Studio
+          </button>
+          <button class="btn-lp-card-desktop" type="button" onclick="openDesktopProjectFromLp('${safeName}', this)" title="Kích hoạt mở trực tiếp trên app CapCut Desktop">
+            <span>🎬</span> Mở CapCut
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterLandingProjects(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderLandingProjects(landingProjectsCache);
+    return;
+  }
+  const filtered = landingProjectsCache.filter(p => (p.name || '').toLowerCase().includes(q));
+  renderLandingProjects(filtered);
+}
+
+async function selectLandingProject(projName) {
+  currentProject = projName;
+  const select = document.getElementById('projectSelect');
+  if (select) select.value = projName;
+  closeLandingPage();
+  await loadProject(projName);
+  showToast(`Đã mở dự án "${projName}" vào Studio!`, 'success');
+}
+
+async function openDesktopProjectFromLp(projName, btn) {
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="scanner-spinner" style="width:10px;height:10px;display:inline-block;vertical-align:middle;"></span>';
+  }
+  try {
+    const res = await fetch('/api/capcut/open-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectName: projName })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`✓ Đã mở dự án "${projName}" trên CapCut Desktop!`, 'success');
+    } else {
+      showToast(data.message || data.error || 'Đã chuyển CapCut về Home.', 'info');
+    }
+  } catch (err) {
+    showToast(`Lỗi mở CapCut: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
+
+async function importCustomProjectFolder() {
+  const pathInput = document.getElementById('lpCustomDraftPath');
+  const rawPath = pathInput ? pathInput.value.trim() : '';
+  if (!rawPath) {
+    showToast('Vui lòng nhập đường dẫn thư mục hoặc file draft_content.json', 'warn');
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/projects/import-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath: rawPath })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(data.message || `Đã nhập dự án "${data.projectName}" thành công!`, 'success');
+      await fetchProjects();
+      await loadLandingProjects(true);
+      await selectLandingProject(data.projectName);
+    } else {
+      showToast(data.detail || data.error || 'Không thể nhập dự án', 'error');
+    }
+  } catch (err) {
+    showToast(`Lỗi kết nối: ${err.message}`, 'error');
+  }
+}
+
+function parseDirectorRequirements(raw) {
+  let hook = '';
+  let cta = '';
+  let pacing = '2.5s';
+  if (!raw || !raw.trim()) return { hook, cta, pacing };
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const mHook = line.match(/^(?:Hook|Tiêu đề|Mở đầu|Banner|Hook 3s)[\s:：\-]+(.*)$/i);
+    if (mHook) { hook = mHook[1].trim(); continue; }
+    
+    const mCta = line.match(/^(?:CTA|Kêu gọi|Hành động|Outro|Kết)[\s:：\-]+(.*)$/i);
+    if (mCta) { cta = mCta[1].trim(); continue; }
+
+    const mPacing = line.match(/^(?:Pacing|Nhịp|Tốc độ|Nhịp cắt)[\s:：\-]+(.*)$/i);
+    if (mPacing) { pacing = mPacing[1].trim(); continue; }
+
+    const mSec = line.match(/(?:nhịp\s*)?(\d+(?:\.\d+)?\s*s)/i);
+    if (mSec && !mHook && !mCta) { pacing = mSec[1].trim(); continue; }
+  }
+
+  if (!hook && lines.length > 0) {
+    hook = lines[0].replace(/^(?:Hook|Tiêu đề)[\s:：\-]+/i, '');
+  }
+  if (!cta && lines.length > 1) {
+    cta = lines[lines.length - 1].replace(/^(?:CTA|Kêu gọi)[\s:：\-]+/i, '');
+  }
+
+  return { hook, cta, pacing };
+}
+
+function fillLpDirectorSample(type) {
+  const dirEl = document.getElementById('lpDirectorPromptText');
+  if (!dirEl) return;
+  if (type === 'fb') {
+    dirEl.value = `Hook: TRÀ SỮA ĐẬM VỊ ĐÔNG KHÁCH
+CTA: GHÉ QUÁN NHẬN NGAY ƯU ĐÃI 30%
+Pacing: 2.5s
+Phong cách: F&B ấm áp tươi sáng, cận cảnh bốc khói đá lạnh`;
+  } else if (type === 'retail') {
+    dirEl.value = `Hook: MÁY XAY MINI SIÊU TIỆN LỢI
+CTA: BẤM MUA NGAY ĐỂ FREE SHIP
+Pacing: 2.0s
+Phong cách: Commercial sắc nét, chi tiết công năng dao xoay`;
+  } else if (type === 'fast') {
+    if (dirEl.value.includes('Pacing:')) {
+      dirEl.value = dirEl.value.replace(/Pacing:[^\n]*/i, 'Pacing: 1.5s (Commercial Hook)');
+    } else {
+      dirEl.value = (dirEl.value.trim() ? dirEl.value.trim() + '\n' : '') + 'Pacing: 1.5s';
+    }
+  } else if (type === 'medium') {
+    if (dirEl.value.includes('Pacing:')) {
+      dirEl.value = dirEl.value.replace(/Pacing:[^\n]*/i, 'Pacing: 2.5s (Tiêu chuẩn)');
+    } else {
+      dirEl.value = (dirEl.value.trim() ? dirEl.value.trim() + '\n' : '') + 'Pacing: 2.5s';
+    }
+  }
+}
+
+function fillLpSampleScript(type) {
+  const txt = document.getElementById('lpRawScriptText');
+  const dirEl = document.getElementById('lpDirectorPromptText');
+  if (!txt) return;
+  if (type === 'fb') {
+    txt.value = `Bạn có biết tại sao trà sữa ở đây luôn đông khách không?
+[BROLL] Cận cảnh pha chế trà sữa trân châu hoàng kim bốc khói đá lạnh.
+Hương vị đậm đà nguyên bản từ lá trà tươi hữu cơ tuyển chọn.
+[BROLL] Khách hàng tươi cười thưởng thức ly nước thơm ngon.
+Ưu đãi giảm 30% cho khách hàng ghé quán tuần này!`;
+    if (dirEl) dirEl.value = `Hook: TRÀ SỮA ĐẬM VỊ ĐÔNG KHÁCH
+CTA: GHÉ QUÁN NHẬN NGAY ƯU ĐÃI 30%
+Pacing: 2.5s
+Phong cách: F&B ấm áp tươi sáng, cận cảnh topping`;
+  } else if (type === 'retail') {
+    txt.value = `Chiếc máy xay cầm tay mini giải cứu mọi bữa ăn nhanh cho người bận rộn.
+[BROLL] Cận cảnh lưỡi dao inox 304 quay tốc độ cao xay nhuyễn hạt và hoa quả.
+Thiết kế không dây nhỏ gọn, sạc Type-C dùng cả tuần.
+[BROLL] Rót sinh tố thơm mịn ra ly cực kỳ bắt mắt.
+Đặt hàng ngay hôm nay để nhận ưu đãi miễn phí giao hàng toàn quốc!`;
+    if (dirEl) dirEl.value = `Hook: MÁY XAY MINI SIÊU TIỆN LỢI
+CTA: BẤM MUA NGAY ĐỂ FREE SHIP
+Pacing: 2.0s
+Phong cách: Commercial sắc nét, chi tiết công năng`;
+  } else {
+    txt.value = `Sản phẩm đỉnh cao với công nghệ hoàn toàn mới năm 2026.
+[BROLL] Góc quay cận cảnh chi tiết thiết kế kim loại nguyên khối sang trọng.
+Độ bền vượt trội, trải nghiệm mượt mà không độ trễ.
+[BROLL] Sử dụng thực tế trong công việc hàng ngày vô cùng tiện lợi.
+Bấm vào giỏ hàng bên dưới để sở hữu ngay giá tốt nhất!`;
+    if (dirEl) dirEl.value = `Hook: CÔNG NGHỆ ĐỘT PHÁ MỚI
+CTA: BẤM VÀO GIỎ HÀNG NGAY
+Pacing: 2.5s
+Phong cách: Hiện đại, công nghệ, mượt mà`;
+  }
+}
+
+function logLpTerminal(msg) {
+  const body = document.getElementById('lpTermBody');
+  if (!body) return;
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+  const line = document.createElement('div');
+  line.textContent = `[${timeStr}] ${msg}`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+}
+
+async function triggerLpCompile() {
+  const projName = document.getElementById('lpProjectName')?.value.trim();
+  const brollFolder = document.getElementById('lpBrollFolder')?.value.trim();
+  const supportingFolder = document.getElementById('lpSupportingFolder')?.value.trim();
+  const vjVideo = document.getElementById('lpVjVideo')?.value.trim();
+  const bgmPath = document.getElementById('lpBgmPath')?.value.trim();
+  const rawScript = document.getElementById('lpRawScriptText')?.value.trim();
+  const directorRaw = document.getElementById('lpDirectorPromptText')?.value.trim() || '';
+  const { hook: hookText, cta: ctaText, pacing: pacingMode } = parseDirectorRequirements(directorRaw);
+  const autoOpenCapcut = document.getElementById('lpChkAutoOpenCapcut')?.checked;
+  
+  if (!projName) {
+    showToast('Vui lòng nhập Tên Dự Án', 'warn');
+    return;
+  }
+  if (!rawScript) {
+    showToast('Vui lòng nhập kịch bản phân cảnh', 'warn');
+    return;
+  }
+  
+  const btn = document.getElementById('btnLpCompile');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="scanner-spinner"></span> Đang phân tích kịch bản & biên dịch 13 lớp...';
+  
+  logLpTerminal(`[MCP-AI] Khởi chạy biên dịch dự án "${projName}"...`);
+  logLpTerminal(`[AI-SCRIPT] Đang bóc tách phân cảnh và timecode theo nhịp "${pacingMode.toUpperCase()}"...`);
+  
+  try {
+    // 1. Phân tích kịch bản qua AI Agent
+    const parseRes = await fetch('/api/ai-agent/parse-script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_script: rawScript, pacing_mode: pacingMode })
+    });
+    const parseData = await parseRes.json();
+    if (!parseData.ok) {
+      throw new Error(parseData.detail || 'Không thể bóc tách kịch bản');
+    }
+    logLpTerminal(`[AI-SCRIPT] ✓ Bóc tách thành công ${parseData.count} câu phân cảnh thoại & B-Roll.`);
+    
+    // 2. Biên dịch 13 Layer qua MCP
+    logLpTerminal(`[MCP-BUILD] Đang phân tầng VJ, Zero-Duplicate B-Roll, BGM Ducking, Subtitle Montserrat...`);
+    const compileRes = await fetch('/api/mcp/create-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectName: projName,
+        vjVideoPath: vjVideo,
+        brollFolderPath: brollFolder,
+        supportingFolder: supportingFolder,
+        bgmPath: bgmPath,
+        hookText: hookText,
+        ctaText: ctaText,
+        excludedClipPaths: [],
+        scriptSentences: parseData.sentences
+      })
+    });
+    const compileData = await compileRes.json();
+    if (!compileData.ok) {
+      throw new Error(compileData.error || 'Biên dịch MCP thất bại');
+    }
+    
+    logLpTerminal(`[MCP-SUCCESS] ✓ Dự án "${compileData.projectName}" đã được tạo thành công!`);
+    showToast(`✓ Đã tạo thành công dự án 13 lớp: "${compileData.projectName}"!`, 'success');
+    
+    // 3. Tự động mở CapCut Desktop nếu được bật
+    if (autoOpenCapcut) {
+      logLpTerminal(`[CAPCUT-DESKTOP] 🎬 Đang nạp và kích hoạt Timeline CapCut Desktop...`);
+      fetch('/api/capcut/open-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectName: compileData.projectName })
+      }).then(r => r.json()).then(oRes => {
+        if (oRes.ok) {
+          logLpTerminal(`[CAPCUT-DESKTOP] ✓ Đã mở timeline CapCut Desktop!`);
+        } else {
+          logLpTerminal(`[CAPCUT-DESKTOP] ℹ ${oRes.message || 'CapCut đã nạp.'}`);
+        }
+      }).catch(e => {
+        logLpTerminal(`[CAPCUT-DESKTOP] Lưu ý: ${e.message}`);
+      });
+    }
+    
+    // 4. Load vào Web Studio & Phát Realtime Timeline
+    await fetchProjects();
+    await loadLandingProjects(true);
+    await selectLandingProject(compileData.projectName);
+    
+    // Tự động tua về đầu và phát Realtime Timeline ngay lập tức!
+    updatePlayheadPosition(0);
+    if (!isPlaying) {
+      togglePlay();
+    }
+    showToast(`🎬 Đang phát Timeline Realtime dự án "${compileData.projectName}"!`, 'success');
+    
+  } catch (err) {
+    logLpTerminal(`[MCP-ERR] Lỗi: ${err.message}`);
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP';
+  }
+}
+
+async function runLpFootageAnalysis() {
+  const folder = document.getElementById('lpBrollFolder')?.value.trim();
+  if (!folder) {
+    showToast('Vui lòng nhập đường dẫn thư mục Footage', 'warn');
+    return;
+  }
+  showToast('Đang quét lọc lỗi footage qua AI & OpenCV...', 'info');
+  logLpTerminal(`[AI-FOOTAGE] Khởi động AI Agent & OpenCV quét chẩn đoán folder: "${folder}"...`);
+  try {
+    const res = await fetch('/api/ai-agent/analyze-footage-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder_path: folder, max_files: 20 })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      logLpTerminal(`[AI-FOOTAGE] ✓ Quét xong: ${data.total_scanned} clip (Đạt: ${data.approved_count}, Cảnh báo: ${data.warning_count}, Loại bỏ: ${data.rejected_count})`);
+      showToast(`✓ Đã quét ${data.total_scanned} clip (${data.approved_count} đạt chuẩn, ${data.rejected_count} clip rung/cháy sáng)`, 'success');
+    } else {
+      logLpTerminal(`[AI-FOOTAGE] Lỗi: ${data.detail || data.message || 'Không thể quét'}`);
+      showToast(data.detail || data.message || 'Không thể quét', 'error');
+    }
+  } catch (err) {
+    logLpTerminal(`[AI-FOOTAGE] Lỗi kết nối: ${err.message}`);
+    showToast(`Lỗi: ${err.message}`, 'error');
+  }
+}
+
+// Khởi chạy Landing Projects khi web tải
+window.addEventListener('DOMContentLoaded', () => {
+  loadLandingProjects();
+});
 
 
 

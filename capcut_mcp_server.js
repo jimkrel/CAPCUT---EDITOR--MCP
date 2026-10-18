@@ -257,7 +257,9 @@ function compile13LayerCommercialDraft(params) {
     material_animations: [],
     video_effects: [],
     transitions: [],
-    drafts: []
+    drafts: [],
+    placeholders: [],
+    effects: []
   };
 
   // 1. Đăng ký VJ Video Material
@@ -459,6 +461,60 @@ function compile13LayerCommercialDraft(params) {
         scale: { x: 1.0, y: 1.0 },
         transform: { x: 0, y: 0.35 } // Banner góc trên an toàn
       },
+      visible: true
+    });
+  }
+
+  // Track 7: Color Grading Layer (Lớp chỉnh màu thương mại phủ toàn bộ Timeline)
+  if (totalDurationUs > 0) {
+    const placeholderId = uuidv4();
+    materials.placeholders.push({
+      id: placeholderId,
+      name: 'Màu Thương Mại (Studio LUT)',
+      type: 'adjust',
+      material_resource_id: ''
+    });
+
+    const effectContrastId = uuidv4();
+    materials.effects.push({
+      id: effectContrastId,
+      type: 'contrast',
+      value: 0.14,
+      visible: true
+    });
+
+    const effectBrightId = uuidv4();
+    materials.effects.push({
+      id: effectBrightId,
+      type: 'brightness',
+      value: 0.07,
+      visible: true
+    });
+
+    const effectSharpenId = uuidv4();
+    materials.effects.push({
+      id: effectSharpenId,
+      type: 'sharpen',
+      value: 0.12,
+      visible: true
+    });
+
+    const effectSaturationId = uuidv4();
+    materials.effects.push({
+      id: effectSaturationId,
+      type: 'saturation',
+      value: 0.10,
+      visible: true
+    });
+
+    tracks[7].segments.push({
+      id: uuidv4(),
+      material_id: placeholderId,
+      extra_material_refs: [effectContrastId, effectBrightId, effectSharpenId, effectSaturationId],
+      target_timerange: { start: 0, duration: totalDurationUs },
+      enable_adjust: true,
+      enable_lut: true,
+      enable_hsl: true,
       visible: true
     });
   }

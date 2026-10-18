@@ -10,9 +10,189 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="editor-shell">
+  <!-- LANDING PAGE / WELCOME HUB (TẠO DỰ ÁN MỚI & NHẬP TỪ MÁY) -->
+  <div class="landing-overlay" id="landingPageOverlay">
+    <div class="landing-topbar">
+      <div class="landing-brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-7 11-4-2.5 4-2.5v5zm6 0-4-2.5 4-2.5v5z"/>
+          </svg>
+        </span>
+        <div class="landing-brand-title">
+          <span>CapCut AI Producer & Co-Director</span>
+          <span class="landing-brand-badge">PRO v2.5</span>
+        </div>
+      </div>
+
+      <!-- Segmented Tabs -->
+      <div class="landing-nav-tabs">
+        <button class="landing-tab-btn active" id="tabLpOpen" onclick="switchLandingTab('open')">
+          <span>📂</span> Mở Dự Án Từ Máy
+        </button>
+        <button class="landing-tab-btn" id="tabLpCreate" onclick="switchLandingTab('create')">
+          <span>✨</span> Tạo Dự Án Mới (13 Lớp MCP)
+        </button>
+      </div>
+
+      <!-- Right Actions -->
+      <div class="landing-top-actions">
+        <div class="landing-capcut-pill">
+          <span class="dot"></span>
+          <span id="lpCapcutStatusText">CapCut Desktop: Sẵn sàng</span>
+        </div>
+        <button class="btn-landing-enter" id="btnEnterStudio" onclick="closeLandingPage()" title="Vào không gian dựng video">
+          <span>🎨 Vào Studio</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="landing-body">
+      <!-- PANE 1: MỞ DỰ ÁN TỪ MÁY -->
+      <div class="landing-pane active" id="lpPaneOpen">
+        <!-- Import from custom machine path -->
+        <div class="lp-import-card">
+          <div class="lp-import-icon">📥</div>
+          <div class="lp-import-text">
+            <h4>Nhập / Mở dự án từ máy tính</h4>
+            <p>Nhập đường dẫn thư mục dự án CapCut hoặc file draft_content.json trên bất kỳ ổ đĩa nào</p>
+          </div>
+          <div class="lp-import-form">
+            <input type="text" id="lpCustomDraftPath" placeholder="Dán đường dẫn thư mục dự án (ví dụ: D:\CapCut_Projects\MyProject)..." class="lp-input">
+            <button class="lp-btn-primary" type="button" onclick="importCustomProjectFolder()">
+              <span>📥</span> Nhập Dự Án
+            </button>
+          </div>
+        </div>
+
+        <!-- Section: Existing Projects in CapCut -->
+        <div class="lp-section-header">
+          <div class="lp-section-title">
+            <span>📁</span> Dự Án CapCut Trên Máy Tính
+            <span style="font-size: 13px; font-weight: normal; color: #64748b;" id="lpProjectsCount">(Đang tải...)</span>
+          </div>
+          <div class="lp-section-controls">
+            <div class="lp-search-box">
+              <span class="lp-search-icon">🔍</span>
+              <input type="text" id="lpProjectSearch" placeholder="Tìm tên dự án..." class="lp-input" oninput="filterLandingProjects(this.value)">
+            </div>
+            <button class="lp-btn-action" onclick="loadLandingProjects(true)" title="Quét lại danh sách">
+              <span>🔄</span> Làm mới
+            </button>
+          </div>
+        </div>
+
+        <div class="lp-projects-grid" id="lpProjectsGrid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- PANE 2: TẠO DỰ ÁN MỚI (CHUẨN SCREENSHOT MCP & PRODUCER) -->
+      <div class="landing-pane" id="lpPaneCreate">
+        <div class="lp-create-grid">
+          <!-- Cột 1: Nguồn Footage & Source Bùa -->
+          <div class="lp-panel-box">
+            <div class="lp-panel-title">
+              <span>📁</span> Nguồn Footage & Source Bùa
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpProjectName">Tên Dự Án (Project Name):</label>
+              <input type="text" id="lpProjectName" placeholder="Tên dự án CapCut (ví dụ: BBSM_SET3_KB21)..." class="lp-input">
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpBrollFolder">Kho Footage Thô B-Roll / A-Roll (Link Folder Path):</label>
+              <div class="lp-input-btn-group">
+                <input type="text" id="lpBrollFolder" placeholder="C:/Users/.../materials/video" class="lp-input">
+                <button class="lp-btn-action" type="button" onclick="runLpFootageAnalysis()">
+                  <span>🔍</span> Quét Lọc Lỗi
+                </button>
+              </div>
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpSupportingFolder">Kho "Source Bùa" (BGM, SFX, LUTs, Brand Motion, Overlays):</label>
+              <input type="text" id="lpSupportingFolder" placeholder="C:/Users/.../materials" class="lp-input">
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpVjVideo">Video VJ / A-Roll Chính:</label>
+              <input type="text" id="lpVjVideo" placeholder="Đường dẫn file video chính (A-Roll)..." class="lp-input">
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpBgmPath">Nhạc Nền BGM (Commercial Ducking):</label>
+              <input type="text" id="lpBgmPath" placeholder="Đường dẫn file nhạc nền (BGM)..." class="lp-input">
+            </div>
+          </div>
+
+          <!-- Cột 2: Kịch Bản & Yêu Cầu Đạo Diễn -->
+          <div class="lp-panel-box">
+            <div class="lp-panel-title">
+              <span>✍️</span> Kịch Bản & Căn Nhịp AI
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpRawScriptText">Điền Kịch Bản Thoại & Phân Cảnh (Plain Text):</label>
+              <textarea id="lpRawScriptText" rows="5" class="lp-textarea" placeholder="Nhập kịch bản plain text tiếng Việt..."></textarea>
+              <div class="lp-quick-scripts">
+                <span style="font-size: 11px; color: #64748b; line-height: 24px;">Mẫu nhanh:</span>
+                <button type="button" class="lp-btn-pill" onclick="fillLpSampleScript('fb')">☕ F&B Đồ Uống</button>
+                <button type="button" class="lp-btn-pill" onclick="fillLpSampleScript('retail')">📦 Bán Lẻ Gia Dụng</button>
+                <button type="button" class="lp-btn-pill" onclick="fillLpSampleScript('review')">📱 Review Sản Phẩm</button>
+              </div>
+            </div>
+
+            <div class="lp-panel-title" style="margin-top: 6px;">
+              <span>🎬</span> Yêu Cầu Đạo Diễn & Pacing
+            </div>
+
+            <div class="lp-form-group">
+              <label for="lpDirectorPromptText">Điền / Dán Yêu Cầu Đạo Diễn, Hook, CTA & Pacing (Plain Text):</label>
+              <textarea id="lpDirectorPromptText" rows="5" class="lp-textarea" placeholder="Dán hoặc điền yêu cầu đạo diễn & pacing tại đây...
+Ví dụ:
+Hook: CẢNH BÁO: ĐỪNG DÙNG LY NHỰA NỮA!
+CTA: BẤM VÀO GIỎ HÀNG NGAY HÔM NAY
+Pacing: 2.5s
+Phong cách: Commercial sôi động, màu tươi sáng"></textarea>
+              <div class="lp-quick-scripts">
+                <span style="font-size: 11px; color: #64748b; line-height: 24px;">Mẫu nhanh:</span>
+                <button type="button" class="lp-btn-pill" onclick="fillLpDirectorSample('fb')">☕ Mẫu F&B Đồ Uống</button>
+                <button type="button" class="lp-btn-pill" onclick="fillLpDirectorSample('retail')">📦 Mẫu Bán Lẻ</button>
+                <button type="button" class="lp-btn-pill" onclick="fillLpDirectorSample('fast')">⚡ Nhịp Nhanh (1.5s)</button>
+                <button type="button" class="lp-btn-pill" onclick="fillLpDirectorSample('medium')">🎯 Tiêu Chuẩn (2.5s)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dưới cùng: Terminal Live & Nút Biên Dịch Lớn -->
+          <div class="lp-compile-footer">
+            <div style="flex: 1; min-width: 280px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Nhật ký thực thi MCP Runtime ● Live</span>
+                <label class="mcp-checkbox-label">
+                  <input type="checkbox" id="lpChkAutoOpenCapcut" checked>
+                  <span>🎬 Tự động mở & load Timeline CapCut Desktop sau khi biên dịch (Không cần tắt app)</span>
+                </label>
+              </div>
+              <div class="lp-terminal-box" id="lpTermBody">
+                <div>[SYSTEM] Khởi tạo MCP Commercial Editor Runtime sẵn sàng.</div>
+              </div>
+            </div>
+
+            <button class="btn-lp-compile-huge" id="btnLpCompile" type="button" onclick="triggerLpCompile()">
+              <span>🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOPBAR (58px) CHUẨN DESIGN REVIEW-CAPCUT-EDITOR-MCP-UI -->
   <header class="topbar">
-    <div class="brand">
+    <div class="brand" onclick="openLandingPage('open')" style="cursor: pointer;" title="Về Trang Chủ / Danh Sách Dự Án">
       <span class="brand-mark">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-7 11-4-2.5 4-2.5v5zm6 0-4-2.5 4-2.5v5z"/>
@@ -21,6 +201,14 @@
       <span>CapCut Studio</span>
     </div>
 
+    <!-- HOME & NEW PROJECT BUTTONS -->
+    <button class="btn-hdr" onclick="openLandingPage('open')" title="Mở danh sách dự án trên máy">
+      <span>🏠</span> Dự Án Máy
+    </button>
+    <button class="btn-hdr" onclick="openLandingPage('create')" style="background: rgba(37, 99, 235, 0.2); border-color: rgba(59, 130, 246, 0.5); color: #60a5fa;" title="Tạo dự án CapCut mới 13 lớp">
+      <span>➕</span> Tạo Dự Án Mới
+    </button>
+
     <!-- PROJECT SELECTOR WITH GREEN STATUS DOT -->
     <div class="project-select">
       <span class="status-dot"></span>
@@ -28,6 +216,11 @@
         <option value="">Đang tải danh sách...</option>
       </select>
     </div>
+
+    <!-- MỞ CAPCUT DESKTOP TRỰC TIẾP (AUTO LOAD TIMELINE) -->
+    <button class="btn-hdr-capcut" id="btnOpenInCapcut" onclick="openCurrentProjectInCapcut()" title="Mở dự án này trực tiếp trong CapCut Desktop (Tự động nạp Timeline mà không cần tắt CapCut)">
+      <span>🎬</span> Mở CapCut Desktop
+    </button>
 
     <!-- BANNER CẢNH BÁO KHI CAPCUT DESKTOP ĐANG CHẠY -->
     <div class="capcut-status-banner" id="capcutStatusBanner" style="display: none;" role="alert">
@@ -868,10 +1061,19 @@
 
       <!-- FOOTER -->
       <div class="mcp-footer">
-        <span class="mcp-footer-hint">💡 AI Agent sẽ tự động loại bỏ clip cháy sáng / rung lắc khỏi bể B-Roll khi biên dịch 13 lớp.</span>
-        <button class="btn-mcp-compile" id="btnCompileMcp" onclick="triggerMcpCompile()">
-          <span>🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP
-        </button>
+        <div class="mcp-footer-options">
+          <label class="mcp-checkbox-label">
+            <input type="checkbox" id="chkAutoOpenCapcut" checked>
+            <span>🎬 Tự động mở & load Timeline CapCut Desktop sau khi biên dịch (Không cần tắt app)</span>
+          </label>
+          <span class="mcp-footer-hint">💡 Tự nạp timeline ngay</span>
+        </div>
+        <div class="mcp-footer-bar">
+          <span class="mcp-footer-hint">💡 AI Agent tự động loại bỏ footage hỏng, ducking BGM & subtitle chuẩn thương mại.</span>
+          <button class="btn-mcp-compile" id="btnCompileMcp" onclick="triggerMcpCompile()">
+            <span>🚀</span> BIÊN DỊCH DỰ ÁN 13 LỚP QUA MCP
+          </button>
+        </div>
       </div>
     </div>
   </div>

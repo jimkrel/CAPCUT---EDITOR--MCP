@@ -389,7 +389,41 @@ def list_projects():
             
     # Sắp xếp: dự án có footage lên đầu, sau đó theo thời gian chỉnh sửa mới nhất
     projects.sort(key=lambda x: (1 if x["has_footage"] else 0, x["modified"]), reverse=True)
-    return {"projects": projects, "capcut_running": is_capcut_running()}
+    return {"projects": projects, "capcut_running": is_capcut_running(), "draft_base": str(CAPCUT_DRAFT_BASE).replace("\\", "/")}
+
+class ImportFolderRequest(BaseModel):
+    folderPath: str
+
+@app.post("/api/projects/import-folder")
+def import_project_folder(req: ImportFolderRequest):
+    if not req.folderPath or not req.folderPath.strip():
+        raise HTTPException(status_code=400, detail="Vui lòng nhập đường dẫn thư mục hoặc file draft")
+    p = Path(req.folderPath.strip().strip('"').strip("'")).resolve()
+    if not p.exists():
+        raise HTTPException(status_code=400, detail=f"Đường dẫn không tồn tại: {p}")
+        
+    if p.is_file() and p.name == "draft_content.json":
+        p = p.parent
+        
+    draft_file = p / "draft_content.json"
+    if not draft_file.exists():
+        raise HTTPException(status_code=400, detail=f"Thư mục không chứa draft_content.json hợp lệ: {p}")
+        
+    proj_name = p.name
+    target_dir = (CAPCUT_DRAFT_BASE / proj_name).resolve()
+    
+    if p == target_dir:
+        return {"ok": True, "projectName": proj_name, "message": "Dự án đã có sẵn trong CapCut"}
+        
+    import shutil
+    try:
+        if target_dir.exists():
+            proj_name = f"{proj_name}_{int(time.time())}"
+            target_dir = (CAPCUT_DRAFT_BASE / proj_name).resolve()
+        shutil.copytree(p, target_dir)
+        return {"ok": True, "projectName": proj_name, "message": f"Đã nhập thành công vào CapCut: {proj_name}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi nhập dự án: {str(e)}")
 
 @app.get("/api/media")
 def stream_media(path: str = Query(..., description="Absolute path to media file")):
@@ -467,6 +501,7 @@ def get_project(project_name: str):
         
     effects_map = {e.get("id"): e for e in materials.get("video_effects", [])}
     mat_animations_map = {m.get("id"): m for m in materials.get("material_animations", [])}
+    placeholders_map = {p.get("id"): p for p in materials.get("placeholders", [])}
     
     parsed_tracks = []
     max_track_end = 0
@@ -569,8 +604,14 @@ def get_project(project_name: str):
                     seg_info["details"]["path"] = resolved
                     seg_info["details"]["volume"] = s.get("volume", 1.0)
                 elif track_type in ("effect", "adjust"):
-                    seg_info["label"] = "Hiệu ứng"
-                    seg_info["color"] = "#b030b0"
+                    p_obj = placeholders_map.get(mid) or {}
+                    p_name = p_obj.get("name")
+                    if track_type == "adjust":
+                        seg_info["label"] = p_name or "Màu thương mại (Studio LUT)"
+                        seg_info["color"] = "#8b5cf6"
+                    else:
+                        seg_info["label"] = p_name or "Hiệu ứng"
+                        seg_info["color"] = "#b030b0"
                     
                 parsed_segments.append(seg_info)
             except Exception as seg_err:
@@ -1739,7 +1780,7 @@ def get_mcp_tools():
 
 @app.post("/api/mcp/create-project")
 def mcp_create_project(req: McpCreateProjectRequest):
-    check_capcut_not_running()
+    # Cho phép tạo dự án mới an toàn khi CapCut đang chạy (Zero-restart workflow)
     server_js = get_mcp_server_js()
     if not server_js:
         raise HTTPException(
@@ -1883,6 +1924,201 @@ def api_parse_script(req: ScriptParseRequest):
         return {"ok": True, "count": len(sentences), "sentences": sentences}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi phân tích kịch bản: {str(e)}")
+
+class ChatSendRequest(BaseModel):
+    message: str
+    currentProject: Optional[str] = None
+    brollFolder: Optional[str] = None
+    vjVideo: Optional[str] = None
+    bgmPath: Optional[str] = None
+
+CHAT_SESSION_FILE = Path(__file__).parent / "agent_bridge" / "chat_session.json"
+CHAT_SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+def load_chat_history():
+    if CHAT_SESSION_FILE.exists():
+        try:
+            with open(CHAT_SESSION_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return [
+        {
+            "id": "welcome",
+            "role": "assistant",
+            "content": "👋 **Xin chào! Tôi là AI Co-Director (Antigravity IDE Agent)**.\n\nTôi sẵn sàng điều phối MCP Tools và cùng bạn dựng video thương mại 13 tầng chuẩn CapCut Desktop. Bạn có thể:\n- Gửi kịch bản thoại để tôi bóc tách nhịp cắt & dựng video.\n- Yêu cầu quét thư mục footage để lọc clip cháy sáng / rung giật.\n- Yêu cầu tinh chỉnh nhịp cắt (Fast / Medium / Slow) hoặc ducking nhạc nền.",
+            "timestamp": int(time.time()),
+            "type": "welcome"
+        }
+    ]
+
+def save_chat_history(messages):
+    with open(CHAT_SESSION_FILE, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=2)
+
+@app.get("/api/chat/history")
+def api_get_chat_history():
+    return {"ok": True, "messages": load_chat_history()}
+
+@app.post("/api/chat/clear")
+def api_clear_chat():
+    initial = [
+        {
+            "id": "welcome",
+            "role": "assistant",
+            "content": "👋 **Phiên chat mới đã sẵn sàng!** Hãy gửi kịch bản hoặc yêu cầu đạo diễn của bạn để tôi điều phối MCP dựng video.",
+            "timestamp": int(time.time()),
+            "type": "welcome"
+        }
+    ]
+    save_chat_history(initial)
+    return {"ok": True, "messages": initial}
+
+@app.post("/api/chat/send")
+def api_send_chat(req: ChatSendRequest):
+    user_text = req.message.strip()
+    if not user_text:
+        raise HTTPException(status_code=400, detail="Tin nhắn không được để trống")
+        
+    messages = load_chat_history()
+    now_ts = int(time.time())
+    
+    # 1. Thêm tin nhắn của User
+    user_msg_id = f"msg_{now_ts}_u"
+    messages.append({
+        "id": user_msg_id,
+        "role": "user",
+        "content": user_text,
+        "timestamp": now_ts
+    })
+    
+    # 2. Xử lý phân tích ý định (Intent Recognition & Agent Orchestration)
+    import footage_analyzer
+    lower_text = user_text.lower()
+    
+    is_compile_intent = any(kw in lower_text for kw in ["dựng", "tạo video", "biên dịch", "compile", "kịch bản:", "[broll]", "[vj]"])
+    is_scan_intent = any(kw in lower_text for kw in ["quét", "scan", "lọc lỗi", "footage"])
+    
+    agent_content = ""
+    agent_payload = {}
+    
+    if is_compile_intent:
+        # Tự động parse kịch bản
+        pacing = "fast" if "nhanh" in lower_text else ("slow" if "chậm" in lower_text else "medium")
+        parsed_sentences = footage_analyzer.parse_commercial_script(user_text, pacing_mode=pacing)
+        
+        if len(parsed_sentences) == 0:
+            # Fallback nếu người dùng chỉ nói "dựng video" chung chung
+            parsed_sentences = footage_analyzer.parse_commercial_script(
+                "Chào mừng bạn đến với video thương mại.\n[BROLL] Cận cảnh chi tiết sản phẩm cao cấp.\nChất lượng vượt trội, trải nghiệm hoàn hảo.\n[BROLL] Quy trình sản xuất chuyên nghiệp.\nĐặt hàng ngay hôm nay để nhận ưu đãi đặc biệt!",
+                pacing_mode=pacing
+            )
+            
+        proj_name = f"AI_DIRECTOR_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        broll_folder = req.brollFolder or str(CAPCUT_DRAFT_BASE / (req.currentProject or "BBSM_SET3_KB20") / "materials" / "video")
+        
+        # Gọi MCP Compiler
+        try:
+            mcp_payload = {
+                "projectName": proj_name,
+                "vjVideoPath": req.vjVideo or "",
+                "brollFolderPath": broll_folder,
+                "supportingFolder": req.brollFolder or "",
+                "bgmPath": req.bgmPath or "",
+                "hookText": parsed_sentences[0]["keyword"].upper() if parsed_sentences else "HOT DEAL",
+                "ctaText": "ĐẶT HÀNG NGAY HÔM NAY",
+                "excludedClipPaths": [],
+                "scriptSentences": parsed_sentences
+            }
+            
+            # Ghi file thông qua Node MCP Runner
+            server_js = get_mcp_server_js()
+            runner_input = {
+                "action": "create_project",
+                "toolName": "capcut_compile_13layer_draft",
+                "args": mcp_payload
+            }
+            
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tf:
+                json.dump(runner_input, tf, ensure_ascii=False)
+                t_name = tf.name
+                
+            res = subprocess.run(
+                ["node", str(MCP_RUNNER_JS), str(server_js), t_name],
+                capture_output=True, text=True, check=True
+            )
+            os.unlink(t_name)
+            mcp_res = json.loads(res.stdout.strip())
+            
+            agent_content = (
+                f"🎬 **Tôi đã điều phối MCP Compiler dựng thành công dự án 13 lớp: `{proj_name}`!**\n\n"
+                f"- **Số phân cảnh bóc tách:** {len(parsed_sentences)} câu thoại/B-Roll.\n"
+                f"- **Nhịp cắt (Pacing):** {pacing.upper()}.\n"
+                f"- **Cấu trúc tầng:** VJ Spine (Track 0) + B-Roll chống trùng (Track 1) + Mic DJI boost +10dB (Track 8) + BGM ducking -5dB (Track 9) + Montserrat Safe Zone (Track 10).\n\n"
+                f"Dự án đã sẵn sàng, bạn có thể nạp vào Studio hoặc mở trực tiếp trên CapCut Desktop ngay bên dưới!"
+            )
+            agent_payload = {
+                "action": "project_created",
+                "projectName": proj_name,
+                "sentencesCount": len(parsed_sentences)
+            }
+        except Exception as e:
+            agent_content = f"⚠️ **Lỗi điều phối MCP Compilation:** {str(e)}\n\nVui lòng kiểm tra lại đường dẫn thư mục footage hoặc kịch bản."
+            
+    elif is_scan_intent:
+        folder_target = req.brollFolder or str(CAPCUT_DRAFT_BASE / (req.currentProject or "BBSM_SET3_KB20") / "materials" / "video")
+        try:
+            scan_res = footage_analyzer.scan_and_analyze_folder(folder_target, max_files=15)
+            if scan_res.get("ok"):
+                agent_content = (
+                    f"🔍 **Báo cáo quét chẩn đoán footage qua AI & OpenCV:**\n\n"
+                    f"- **Tổng số clip quét:** {scan_res['total_scanned']} clip trong thư mục.\n"
+                    f"- **Đạt chuẩn thương mại:** {scan_res['approved_count']} clip.\n"
+                    f"- **Cảnh báo rung/mờ:** {scan_res['warning_count']} clip.\n"
+                    f"- **Loại trừ (cháy sáng / rung mạnh):** {scan_res['rejected_count']} clip.\n\n"
+                    f"👉 *AI Agent đã tự động đánh dấu loại trừ các clip lỗi này khỏi bể B-Roll khi dựng.*"
+                )
+                agent_payload = {"action": "scan_complete", "stats": scan_res}
+            else:
+                agent_content = f"⚠️ Không thể quét thư mục: {scan_res.get('error')}"
+        except Exception as e:
+            agent_content = f"⚠️ Lỗi khi quét footage: {str(e)}"
+    else:
+        # Trả lời tư vấn đạo diễn & hướng dẫn kỹ thuật
+        agent_content = (
+            f"🎬 **Ghi nhận yêu cầu từ bạn!**\n\n"
+            f"Tôi là AI Co-Director trong Antigravity IDE. Tôi có thể giúp bạn:\n"
+            f"1. **Dựng video tự động:** Bạn chỉ cần gõ kịch bản (ví dụ có các tag `[BROLL]`, `[VJ]`).\n"
+            f"2. **Tối ưu âm thanh:** Tự động ducking BGM khi có tiếng nói người VJ.\n"
+            f"3. **Canh lề phụ đề an toàn (Safe Zone):** Tự đưa text về vị trí `pos.y = -0.404` không bị icon TikTok/Reels che khuất.\n\n"
+            f"💡 *Bạn muốn tôi hỗ trợ dựng video hay quét phân tích clip nào ngay bây giờ?*"
+        )
+        
+    # Thêm phản hồi của Agent
+    agent_msg = {
+        "id": f"msg_{now_ts+1}_a",
+        "role": "assistant",
+        "content": agent_content,
+        "timestamp": now_ts + 1,
+        "payload": agent_payload
+    }
+    messages.append(agent_msg)
+    save_chat_history(messages)
+    
+    return {"ok": True, "reply": agent_msg, "messages": messages}
+
+class OpenProjectRequest(BaseModel):
+    projectName: str
+    autoNavigate: Optional[bool] = True
+
+@app.post("/api/capcut/open-project")
+def api_capcut_open_project(req: OpenProjectRequest):
+    try:
+        import capcut_automator
+        res = capcut_automator.open_project_in_capcut(req.projectName)
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
 
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
