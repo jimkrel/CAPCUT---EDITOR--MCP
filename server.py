@@ -1705,6 +1705,7 @@ def get_mcp_server_js() -> Optional[Path]:
         return None  # Biến môi trường đã được đặt nhưng file không tồn tại
     # Fallback kiểm tra các vị trí quen thuộc khi không đặt biến môi trường
     candidates = [
+        Path(__file__).parent / "capcut_mcp_server.js",
         Path(__file__).parent.parent / "capcut-roughcut-studio" / "capcut_mcp_server.js",
         Path.home() / ".gemini" / "antigravity-ide" / "scratch" / "capcut-roughcut-studio" / "capcut_mcp_server.js"
     ]
