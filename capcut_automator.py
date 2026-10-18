@@ -44,18 +44,33 @@ def attach_to_default_desktop():
         return None
 
 def find_capcut_windows() -> List[int]:
-    """Tim tat ca handle cua so CapCut tren WinSta0\\Default."""
+    """Tim cua so CapCut THUC SU HIEN THI (Visible GUI Window) tren WinSta0\\Default."""
     hdesk = attach_to_default_desktop()
     windows = []
     try:
-        import win32gui, win32process
+        import win32gui, win32process, psutil
         def enum_cb(hwnd, _):
-            if win32gui.IsWindow(hwnd):
+            if win32gui.IsWindow(hwnd) and win32gui.IsWindowVisible(hwnd):
                 txt = win32gui.GetWindowText(hwnd)
                 cls = win32gui.GetClassName(hwnd)
-                if 'CapCut' in txt or 'Qt622QWindowIcon' in cls:
-                    windows.append(hwnd)
-        
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                pname = ""
+                try:
+                    pname = psutil.Process(pid).name().lower()
+                except Exception:
+                    pass
+
+                # Cua so chinh CapCut: process CapCut.exe, tieu de CapCut, kich thuoc hop le
+                if 'capcut' in pname and txt == 'CapCut':
+                    try:
+                        rect = win32gui.GetWindowRect(hwnd)
+                        w = rect[2] - rect[0]
+                        h = rect[3] - rect[1]
+                        if w > 300 and h > 200:
+                            windows.append(hwnd)
+                    except Exception:
+                        windows.append(hwnd)
+
         desktop_handle = int(hdesk) if hdesk else None
         if desktop_handle:
             win32gui.EnumDesktopWindows(desktop_handle, enum_cb, None)
