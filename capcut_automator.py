@@ -51,25 +51,22 @@ def _get_capcut_window():
     return None
 
 def launch_capcut(wait_sec=10):
-    shortcut = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "CapCut" / "CapCut.lnk"
-    launcher = Path(LOCALAPPDATA) / "CapCut" / "Apps" / "CapCut.exe"
+    if is_capcut_running():
+        return True
+
+    if not CAPCUT_EXE or not Path(CAPCUT_EXE).exists():
+        logger.error("Không tìm thấy CapCut.exe trên máy")
+        return False
+
+    exe_path = str(CAPCUT_EXE)
+    exe_dir = str(Path(CAPCUT_EXE).parent)
 
     try:
-        if shortcut.exists():
-            os.startfile(str(shortcut))
-        elif launcher.exists():
-            os.startfile(str(launcher))
-        elif CAPCUT_EXE and Path(CAPCUT_EXE).exists():
-            os.startfile(str(CAPCUT_EXE))
-        else:
-            return False
+        subprocess.Popen([exe_path], cwd=exe_dir)
+        logger.info(f"Đã kích hoạt khởi chạy CapCut: {exe_path} (cwd: {exe_dir})")
     except Exception as e:
-        logger.warning(f"Lỗi startfile: {e}")
-        if CAPCUT_EXE:
-            try:
-                subprocess.Popen([str(CAPCUT_EXE)])
-            except Exception:
-                return False
+        logger.error(f"Lỗi khởi chạy CapCut: {e}")
+        return False
 
     for _ in range(wait_sec * 2):
         time.sleep(0.5)
