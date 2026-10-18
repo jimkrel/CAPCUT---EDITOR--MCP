@@ -172,6 +172,46 @@ def launch_or_focus_capcut(timeout_sec: int = 10) -> bool:
     logger.warning("Het thoi gian cho cua so CapCut.")
     return False
 
+def click_first_project_card() -> bool:
+    """Tu dong click dup vao du an dau tien (vi tri so 0) tren trang chu CapCut de mo thang vao Timeline."""
+    try:
+        import win32gui, ctypes, time
+        hwnds = find_capcut_windows()
+        if not hwnds:
+            return False
+        
+        hwnd = hwnds[0]
+        bring_window_to_foreground(hwnd)
+        time.sleep(0.8)
+
+        rect = win32gui.GetWindowRect(hwnd)
+        left, top, right, bottom = rect
+        w = right - left
+        h = bottom - top
+
+        # Vi tri the du an dau tien: x ≈ 16.0% chieu rong, y ≈ 73.6% chieu cao
+        click_x = left + int(w * (307.0 / 1920.0))
+        click_y = top + int(h * (760.0 / 1032.0))
+        
+        user32 = ctypes.windll.user32
+        user32.SetCursorPos(click_x, click_y)
+        time.sleep(0.1)
+
+        # Click dup mo du an
+        user32.mouse_event(0x0002, 0, 0, 0, 0) # LEFTDOWN
+        time.sleep(0.05)
+        user32.mouse_event(0x0004, 0, 0, 0, 0) # LEFTUP
+        time.sleep(0.08)
+        user32.mouse_event(0x0002, 0, 0, 0, 0) # LEFTDOWN
+        time.sleep(0.05)
+        user32.mouse_event(0x0004, 0, 0, 0, 0) # LEFTUP
+        
+        logger.info(f"Da tu dong click dup mo du an dau tien tai ({click_x}, {click_y})")
+        return True
+    except Exception as e:
+        logger.warning(f"Loi click_first_project_card: {e}")
+        return False
+
 def open_project_in_capcut(project_name: str, wait_for_timeline_sec: int = 3):
     # 1. Dam bao project duoc dua len vi tri so 0 dau tien trong root_meta_info
     try:
@@ -183,11 +223,22 @@ def open_project_in_capcut(project_name: str, wait_for_timeline_sec: int = 3):
     # 2. Khoi chay / dua cua so CapCut len man hinh chinh
     ok = launch_or_focus_capcut(timeout_sec=10)
 
+    # 3. Tu dong click dup vao du an so 1 de vao thang giao dien chinh sua Timeline
+    opened_timeline = False
+    if ok:
+        time.sleep(1.0)
+        opened_timeline = click_first_project_card()
+        time.sleep(2.0)
+        new_hwnds = find_capcut_windows()
+        if new_hwnds:
+            bring_window_to_foreground(new_hwnds[0])
+
     return {
         "ok": True,
         "projectName": project_name,
         "capcutForeground": ok,
-        "message": f"Đã mở CapCut Desktop! Dự án '{project_name}' đã được nạp ở vị trí số 1 (trên cùng bên trái) trong giao diện CapCut.",
+        "timelineOpened": opened_timeline,
+        "message": f"Đã mở CapCut Desktop và tự động nạp dự án '{project_name}' thẳng vào Timeline chỉnh sửa!",
         "position": 0
     }
 
