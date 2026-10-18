@@ -454,7 +454,8 @@ def parse_commercial_script(raw_text: str, pacing_mode: str = "medium") -> List[
             "word_count": word_count,
             "startSec": start_sec,
             "endSec": end_sec,
-            "durationSec": dur_sec
+            "durationSec": dur_sec,
+            "durationUs": int(round(dur_sec * 1e6))
         })
 
     return sentences
