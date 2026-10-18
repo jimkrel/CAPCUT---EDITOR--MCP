@@ -16,7 +16,7 @@ import uuid
 import logging
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 import numpy as np
 
@@ -167,6 +167,27 @@ def get_broll_files(broll_folder: str) -> List[Path]:
     folder = Path(broll_folder)
     return [f for f in sorted(folder.iterdir()) if f.suffix.lower() in exts and f.is_file()]
 
+def sanitize_media_path(file_path: Union[str, Path], staging_dir: Optional[Path] = None) -> str:
+    """
+    Chuẩn hóa đường dẫn tệp đa phương tiện cho CapCut Desktop:
+    - Loại bỏ ký tự Unicode Private Use Area (như \uf022 sinh ra từ tên thư mục chứa dấu ':' trên exFAT)
+    - Tự động sao chép sang thư mục staging sạch nếu đường dẫn chứa ký tự bất thường gây crash C++ engine.
+    """
+    if not file_path:
+        return ""
+    p = Path(file_path)
+    raw_str = str(p.resolve())
+    has_pua = any(0xE000 <= ord(c) <= 0xF8FF for c in raw_str)
+    if has_pua and staging_dir:
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = "".join(c for c in p.name if c.isalnum() or c in (".", "-", "_"))
+        target = staging_dir / safe_name
+        if not target.exists() or target.stat().st_size != p.stat().st_size:
+            import shutil
+            shutil.copy2(p, target)
+        return str(target).replace("\\", "/")
+    return raw_str.replace("\\", "/")
+
 # =====================================================================
 # 4. CAPCUT DRAFT TIMELINE COMPILER (Pure Python)
 # =====================================================================
@@ -251,9 +272,12 @@ def build_autoedit_draft(
         materials["canvases"].append({"id": c_id, "type": "canvas_color", "color": "#00000000"})
         return c_id
 
+    staging_audio = draft_dir / "materials" / "audio"
+    staging_video = draft_dir / "materials" / "video"
+
     # 4. Đăng ký BGM Material & Beat Material
     bgm_mat_id = uuidv4()
-    bgm_path_norm = str(Path(music_path).resolve()).replace("\\", "/")
+    bgm_path_norm = sanitize_media_path(music_path, staging_audio)
     materials["audios"].append({
         "id": bgm_mat_id,
         "type": "audio",
@@ -288,7 +312,7 @@ def build_autoedit_draft(
     interview_video_mat_id = None
     interview_audio_mat_id = None
     if interview_path and Path(interview_path).exists():
-        norm_iv = str(Path(interview_path).resolve()).replace("\\", "/")
+        norm_iv = sanitize_media_path(interview_path, staging_video)
         interview_video_mat_id = uuidv4()
         interview_audio_mat_id = uuidv4()
         materials["videos"].append({
@@ -314,7 +338,7 @@ def build_autoedit_draft(
     # Đăng ký B-Roll materials
     broll_mat_ids = []
     for bf in broll_files:
-        norm_bf = str(bf.resolve()).replace("\\", "/")
+        norm_bf = sanitize_media_path(bf, staging_video)
         m_id = uuidv4()
         materials["videos"].append({
             "id": m_id,
