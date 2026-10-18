@@ -1,0 +1,98 @@
+{
+  "templates": {
+    "to_kraft": {
+      "name": "Tô Kraft Mang Đi",
+      "hook_prefix": "TÔ KRAFT",
+      "voice_wpm": 130,
+      "broll_keywords": {
+        "size":    ["750ml","1000ml","ml","size","dung tich","kich thuoc"],
+        "nap":     ["nap pet","nap pp","nap","day","pet","pp"],
+        "logo":    ["logo","in an","nhan dien","thuong hieu","in logo"],
+        "kraft":   ["kraft","chat lieu","giay","moc mac","nau"],
+        "food":    ["mi","bun","salad","do an","mon an","thuc an","cay","tron","nuoc","com"],
+        "pack":    ["mang di","dong goi","gon gang","takeaway","man"],
+        "cta":     ["lien he","nhan","bbsm","tu van","dat hang","ho tro"]
+      },
+      "structure": ["intro_hook", "product_intro", "size_demo", "use_case", "material", "cta"]
+    },
+
+    "hop_banh": {
+      "name": "Hộp Bánh / Hộp Thực Phẩm",
+      "hook_prefix": "HỘP BÁNH",
+      "voice_wpm": 125,
+      "broll_keywords": {
+        "cua_so":  ["cua so","trong","kinh","nhin","ngam"],
+        "nap":     ["nap","dong","mo nap","bat nap"],
+        "logo":    ["logo","in an","nhan hieu","thuong hieu"],
+        "kraft":   ["kraft","giay","trang","den","mau"],
+        "size":    ["size","cm","kich thuoc","lon","nho","vua"],
+        "banh":    ["banh","cookie","mousse","cupcake","snack","do ngot"],
+        "pack":    ["goi","tang","quan","bao bi","hop qua","hop trang tri"],
+        "cta":     ["lien he","nhan","bbsm","tu van","dat hang","order"]
+      },
+      "structure": ["intro_hook", "product_intro", "window_demo", "size_demo", "material", "gift_use", "cta"]
+    },
+
+    "ly_nuoc": {
+      "name": "Ly Nước / Cốc Giấy",
+      "hook_prefix": "LY GIẤY",
+      "voice_wpm": 135,
+      "broll_keywords": {
+        "size":    ["oz","ml","size","250","300","500","dung tich"],
+        "nap":     ["nap dome","nap flat","nap","dome","straw","ong hut"],
+        "logo":    ["logo","in an","nhan dien","thuong hieu"],
+        "nuoc":    ["nuoc","tra","cafe","tra sua","sinh to","nuoc ep","juice"],
+        "chat":    ["giay","PE","chat lieu","day","mong"],
+        "pack":    ["mang di","takeaway","giao hang","boc go"],
+        "cta":     ["lien he","bbsm","tu van","dat hang","order","so luong"]
+      },
+      "structure": ["intro_hook", "product_intro", "size_demo", "drink_demo", "material", "cta"]
+    },
+
+    "tui_giay": {
+      "name": "Túi Giấy / Túi Kraft",
+      "hook_prefix": "TÚI GIẤY",
+      "voice_wpm": 130,
+      "broll_keywords": {
+        "quai":    ["quai","quai giay","quai ribbon","quai nylon","tay cam"],
+        "size":    ["size","cm","lon","nho","vua","kho","cao","rong"],
+        "logo":    ["logo","in an","nhan dien","in offset","chup"],
+        "chat":    ["kraft","trang","den","bong","mat","chat lieu"],
+        "dung":    ["do","banh","qua","dung","chua","dung luong"],
+        "pack":    ["dong goi","tang","qua","bao bi","gift","qua tang"],
+        "cta":     ["lien he","bbsm","tu van","dat hang","lien lac"]
+      },
+      "structure": ["intro_hook", "product_intro", "size_options", "material", "logo_demo", "use_case", "cta"]
+    },
+
+    "hop_pizza": {
+      "name": "Hộp Pizza / Carton",
+      "hook_prefix": "HỘP PIZZA",
+      "voice_wpm": 128,
+      "broll_keywords": {
+        "size":    ["size","inch","cm","8 inch","10 inch","12 inch"],
+        "nap":     ["nap","gap","mo","dong"],
+        "logo":    ["logo","in","offset","in mau","thuong hieu"],
+        "chat":    ["song","carton","giay","day","ben","chat"],
+        "pizza":   ["pizza","banh","thuc an","do an nong"],
+        "pack":    ["goi","mang di","delivery","giao"],
+        "cta":     ["lien he","bbsm","tu van","dat","order"]
+      },
+      "structure": ["intro_hook", "product_intro", "size_demo", "material", "cta"]
+    },
+
+    "custom": {
+      "name": "Tuỳ Chỉnh (AI tự học từ tên file)",
+      "hook_prefix": "",
+      "voice_wpm": 130,
+      "broll_keywords": {},
+      "structure": ["intro_hook", "product_intro", "demo", "cta"],
+      "auto_learn_from_filenames": true
+    }
+  },
+
+  "global_keywords": {
+    "always_cta": ["lien he","nhan tin","bbsm","tu van","dat hang","ho tro","order","lien lac"],
+    "always_hook": ["anh chi","ban","muon","tim","can","dang can","dang tim"]
+  }
+}
