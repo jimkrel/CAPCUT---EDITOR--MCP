@@ -1,4 +1,4 @@
-﻿"""
+"""
 capcut_automator.py - Tu dong hoa CapCut Desktop (Windows)
 1. Khoi chay CapCut.exe neu chua mo
 2. Neu CapCut dang o HOME → dieu huong vao project vua compile
@@ -180,6 +180,12 @@ def compile_and_open(project_name, script_sentences, vj_video_path="", broll_fol
 
     if not compile_result.get("ok"):
         return {"ok": False, "step": "compile", "error": compile_result.get("error")}
+
+    try:
+        from register_draft import register_project_in_capcut
+        register_project_in_capcut(project_name)
+    except Exception as re:
+        logger.warning(f"Lỗi đăng ký root_meta_info: {re}")
 
     launch_result = open_project_in_capcut(project_name)
     return {"ok": launch_result.get("ok"), "compile": compile_result, "launch": launch_result}

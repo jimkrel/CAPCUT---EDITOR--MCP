@@ -1821,7 +1821,15 @@ def mcp_create_project(req: McpCreateProjectRequest):
             text=True,
             check=True
         )
-        return json.loads(proc.stdout.strip())
+        res_data = json.loads(proc.stdout.strip())
+        if res_data.get("ok"):
+            try:
+                import register_draft
+                reg_res = register_draft.register_project_in_capcut(req.projectName)
+                logging.info(f"Đăng ký CapCut root_meta_info: {reg_res}")
+            except Exception as reg_err:
+                logging.warning(f"Lỗi đăng ký root_meta_info: {reg_err}")
+        return res_data
     except subprocess.CalledProcessError as cpe:
         err_msg = cpe.stderr.strip() or cpe.stdout.strip()
         raise HTTPException(status_code=500, detail=f"Lỗi MCP runner: {err_msg}")
