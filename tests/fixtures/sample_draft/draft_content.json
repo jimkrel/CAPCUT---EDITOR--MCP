@@ -1,0 +1,147 @@
+{
+  "duration": 24000000,
+  "fps": 30.0,
+  "materials": {
+    "videos": [
+      {"id": "mat_v1", "path": "clip1.mp4", "duration": 8000000},
+      {"id": "mat_v2", "path": "clip2.mp4", "duration": 8000000},
+      {"id": "mat_v3", "path": "clip3.mp4", "duration": 8000000}
+    ],
+    "audios": [
+      {"id": "mat_a1", "path": "bgm.mp3", "duration": 24000000},
+      {"id": "mat_a2", "path": "voice.mp3", "duration": 12000000}
+    ],
+    "texts": [
+      {"id": "mat_t1", "content": "{\"text\": \"CẢNH BÁO: ĐỪNG DÙNG LY NHỰA NỮA!\", \"styles\": []}"},
+      {"id": "mat_t2", "content": "{\"text\": \"Phụ đề đoạn 2\", \"styles\": []}"},
+      {"id": "mat_t3", "content": "{\"text\": \"<img src=x id=xss1>\", \"styles\": []}"},
+      {"id": "mat_t4", "content": "{\"text\": \"Ưu đãi chỉ từ 1.100đ\", \"styles\": []}"},
+      {"id": "mat_t5", "content": "{\"text\": \"Chất liệu bã mía tự nhiên\", \"styles\": []}"},
+      {"id": "mat_t6", "content": "{\"text\": \"BẤM VÀO GIỎ HÀNG NGAY HÔM NAY\", \"styles\": []}"}
+    ],
+    "video_effects": [
+      {"id": "eff_1", "name": "Zoom In"},
+      {"id": "eff_2", "name": "Flash"}
+    ],
+    "speeds": []
+  },
+  "tracks": [
+    {
+      "id": "tr_v1",
+      "type": "video",
+      "segments": [
+        {
+          "id": "sv1",
+          "material_id": "mat_v1",
+          "target_timerange": {"start": 0, "duration": 8000000},
+          "source_timerange": {"start": 0, "duration": 8000000},
+          "clip": {"scale": {"x": 1.0, "y": 1.0}}
+        },
+        {
+          "id": "sv2",
+          "material_id": "mat_v2",
+          "target_timerange": {"start": 8000000, "duration": 8000000},
+          "source_timerange": {"start": 0, "duration": 8000000},
+          "clip": {"scale": {"x": 1.0, "y": 1.0}}
+        }
+      ]
+    },
+    {
+      "id": "tr_v2",
+      "type": "video",
+      "segments": [
+        {
+          "id": "sv3",
+          "material_id": "mat_v3",
+          "target_timerange": {"start": 16000000, "duration": 8000000},
+          "source_timerange": {"start": 0, "duration": 8000000},
+          "clip": {"scale": {"x": 1.0, "y": 1.0}}
+        }
+      ]
+    },
+    {
+      "id": "tr_a1",
+      "type": "audio",
+      "segments": [
+        {
+          "id": "sa1",
+          "material_id": "mat_a1",
+          "target_timerange": {"start": 0, "duration": 24000000},
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "tr_a2",
+      "type": "audio",
+      "segments": [
+        {
+          "id": "sa2",
+          "material_id": "mat_a2",
+          "target_timerange": {"start": 2000000, "duration": 12000000},
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "tr_t1",
+      "type": "text",
+      "segments": [
+        {
+          "id": "st1",
+          "material_id": "mat_t1",
+          "target_timerange": {"start": 0, "duration": 4000000},
+          "clip": {"transform": {"y": -0.62}}
+        },
+        {
+          "id": "st2",
+          "material_id": "mat_t2",
+          "target_timerange": {"start": 4000000, "duration": 4000000},
+          "clip": {"transform": {"y": -0.404}}
+        },
+        {
+          "id": "st3",
+          "material_id": "mat_t3",
+          "target_timerange": {"start": 8000000, "duration": 4000000},
+          "clip": {"transform": {"y": -0.62}}
+        },
+        {
+          "id": "st4",
+          "material_id": "mat_t4",
+          "target_timerange": {"start": 12000000, "duration": 4000000},
+          "clip": {"transform": {"y": -0.404}}
+        },
+        {
+          "id": "st5",
+          "material_id": "mat_t5",
+          "target_timerange": {"start": 16000000, "duration": 4000000},
+          "clip": {"transform": {"y": -0.404}}
+        },
+        {
+          "id": "st6",
+          "material_id": "mat_t6",
+          "target_timerange": {"start": 20000000, "duration": 4000000},
+          "clip": {"transform": {"y": -0.404}}
+        }
+      ]
+    },
+    {
+      "id": "tr_eff1",
+      "type": "effect",
+      "segments": [
+        {
+          "id": "seff1",
+          "material_id": "eff_1",
+          "target_timerange": {"start": 0, "duration": 3000000},
+          "clip": null
+        },
+        {
+          "id": "seff2",
+          "material_id": "eff_2",
+          "target_timerange": {"start": 8000000, "duration": 3000000},
+          "clip": null
+        }
+      ]
+    }
+  ]
+}

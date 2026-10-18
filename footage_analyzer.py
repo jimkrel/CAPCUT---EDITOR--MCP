@@ -352,14 +352,34 @@ def scan_and_analyze_folder(folder_path: str, max_files: int = 25, profile: str 
         elif res.get("status") == "FAIL":
             rejected_count += 1
 
+    summary = {
+        "total_scanned": len(results),
+        "approved_count": passed_count,
+        "warning_count": warning_count,
+        "rejected_count": rejected_count,
+        "health_score": round((passed_count + warning_count * 0.5) / max(1, len(results)) * 100)
+    }
+
+    proposals = []
+    if rejected_count > 0:
+        proposals.append(f"AI đề xuất loại trừ {rejected_count} clip bị rung lắc hoặc cháy sáng khỏi bể B-Roll để đảm bảo nhịp dựng.")
+    if warning_count > 0:
+        proposals.append(f"Đề xuất áp dụng Punch-in Zoom 1.15x hoặc hạ Highlight cho {warning_count} clip có cảnh báo nhẹ.")
+    if not proposals:
+        proposals.append("Toàn bộ footage đạt chuẩn thương mại cao, sẵn sàng biên dịch 13 lớp CapCut.")
+
     return {
+        "status": "success",
         "ok": True,
+        "summary": summary,
+        "proposals": proposals,
+        "files": results,
         "folder_path": str(folder).replace('\\', '/'),
         "total_files": len(results),
         "passed_count": passed_count,
         "warning_count": warning_count,
         "rejected_count": rejected_count,
-        "health_score": round((passed_count + warning_count * 0.5) / max(1, len(results)) * 100),
+        "health_score": summary["health_score"],
         "footages": results
     }
 

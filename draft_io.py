@@ -224,18 +224,18 @@ def get_project_dict(project_name: str) -> dict:
                 if track_type == "text":
                     t_info = texts_map.get(mid) or {}
                     seg_info["label"] = t_info.get("text", "Văn bản") or "Văn bản trống"
-                    seg_info["color"] = "#6366f1"
+                    seg_info["color"] = "#4338ca"
                     seg_info["details"]["text"] = t_info.get("text", "")
                 elif track_type == "sticker":
                     st_obj = stickers_map.get(mid) or {}
                     seg_info["label"] = st_obj.get("name", "Sticker") or "Ảnh vector"
-                    seg_info["color"] = "#d97706"
+                    seg_info["color"] = "#92400e"
                 elif track_type == "video":
                     v_obj = videos_map.get(mid) or {}
                     resolved = v_obj.get("_resolved_path", "")
                     filename = os.path.basename(resolved) if resolved else ""
                     seg_info["label"] = filename or "Video Clip"
-                    seg_info["color"] = "#2563eb"
+                    seg_info["color"] = "#1d4ed8"
                     seg_info["media_path"] = resolved
                     seg_info["details"]["path"] = resolved
                 elif track_type == "audio":
@@ -243,12 +243,12 @@ def get_project_dict(project_name: str) -> dict:
                     resolved = a_obj.get("_resolved_path", "")
                     filename = os.path.basename(resolved) if resolved else ""
                     seg_info["label"] = filename or "Audio"
-                    seg_info["color"] = "#0d9488"
+                    seg_info["color"] = "#065f46"
                     seg_info["media_path"] = resolved
                     seg_info["details"]["path"] = resolved
                 elif track_type in ("effect", "adjust"):
                     seg_info["label"] = "Hiệu ứng"
-                    seg_info["color"] = "#db2777"
+                    seg_info["color"] = "#9d174d"
                     
                 parsed_segments.append(seg_info)
             except Exception as seg_err:
@@ -266,7 +266,7 @@ def get_project_dict(project_name: str) -> dict:
                     "sticker": "Nhãn dán"
                 }
                 fallback_label = type_labels.get(track_type, "Clip")
-                fallback_color = "#2563eb" if track_type == "video" else ("#0d9488" if track_type == "audio" else "#d97706")
+                fallback_color = "#1d4ed8" if track_type == "video" else ("#065f46" if track_type == "audio" else "#4338ca")
                 parsed_segments.append({
                     "id": s.get("id", "?"),
                     "material_id": s.get("material_id", ""),

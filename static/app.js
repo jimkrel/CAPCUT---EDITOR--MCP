@@ -46,6 +46,32 @@ function maskUserPath(p) {
   return str;
 }
 
+// Safe DOM helpers (chống lỗi Cannot set properties of null)
+function setText(id, value) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (el) el.textContent = (value != null ? value : '');
+}
+
+function setHTML(id, html) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (el) el.innerHTML = (html != null ? html : '');
+}
+
+function toggleClass(id, className, force) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (el) el.classList.toggle(className, force);
+}
+
+function setVal(id, value) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (el) el.value = (value != null ? value : '');
+}
+
+function setDisplay(id, displayStyle) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (el) el.style.display = displayStyle;
+}
+
 // Helper: Hệ thống Toast notification góc dưới phải
 function getToastContainer() {
   let c = document.getElementById('toastContainer');
@@ -58,8 +84,47 @@ function getToastContainer() {
   return c;
 }
 
-function showToast(message, type = 'info', actionText = null, actionCb = null, duration = 4000) {
+// Quản lý trạng thái đồng bộ Draft thật (C7)
+function setDraftSyncState(state, customText) {
+  const statusEl = document.getElementById('draftSyncStatus');
+  const textEl = document.getElementById('draftSyncStatusText');
+  if (!statusEl || !textEl) return;
+  
+  if (state === 'saving') {
+    textEl.textContent = customText || 'Đang lưu draft...';
+    statusEl.style.color = '#f59e0b';
+  } else if (state === 'synced') {
+    textEl.textContent = customText || 'Đã đồng bộ Draft';
+    statusEl.style.color = '#69d8a4';
+  } else if (state === 'locked') {
+    textEl.textContent = customText || 'Bị khóa (CapCut đang mở)';
+    statusEl.style.color = '#fbbf24';
+  } else if (state === 'error') {
+    textEl.textContent = customText || 'Lỗi lưu draft';
+    statusEl.style.color = '#f43f5e';
+  }
+}
+
+function showToast(message, type = 'info', actionText = null, actionCb = null, duration = null) {
   const container = getToastContainer();
+  
+  // C6: Gộp toast trùng nội dung đang hiển thị
+  const existingToasts = Array.from(container.querySelectorAll('.toast-item'));
+  for (const t of existingToasts) {
+    const msgEl = t.querySelector('.toast-msg');
+    if (msgEl && msgEl.textContent === message) {
+      t.style.animation = 'none';
+      t.offsetHeight; // trigger reflow
+      t.style.animation = '';
+      return;
+    }
+  }
+
+  // C6: Tối đa 3 toast cùng lúc (cái mới đẩy cái cũ nhất)
+  while (container.children.length >= 3) {
+    container.firstElementChild.remove();
+  }
+
   const toast = document.createElement('div');
   toast.className = `toast-item toast-${type}`;
   
@@ -69,7 +134,7 @@ function showToast(message, type = 'info', actionText = null, actionCb = null, d
   if (actionText && typeof actionCb === 'function') {
     html += `<button class="toast-action-btn" type="button">${esc(actionText)}</button>`;
   }
-  html += `<button class="toast-close-btn" type="button">&times;</button>`;
+  html += `<button class="toast-close-btn" type="button" aria-label="Đóng thông báo">&times;</button>`;
   toast.innerHTML = html;
   
   if (actionText && typeof actionCb === 'function') {
@@ -84,10 +149,13 @@ function showToast(message, type = 'info', actionText = null, actionCb = null, d
   
   container.appendChild(toast);
   
+  // C6: Tự ẩn 4–6s cho info/success/warn; toast lỗi >= 8s
+  const autoHideMs = duration || (type === 'error' ? 8500 : 4500);
+  
   setTimeout(() => {
     toast.classList.add('toast-fade-out');
     setTimeout(() => toast.remove(), 250);
-  }, duration);
+  }, autoHideMs);
 }
 
 // Debounce quét lỗi timeline
@@ -195,7 +263,10 @@ function initSplitters() {
   const lowerTimeline = document.getElementById('lowerTimeline');
   if (splTl && lowerTimeline) {
     const savedH = localStorage.getItem('capcut_timeline_height');
-    if (savedH) lowerTimeline.style.height = `${savedH}px`;
+    if (savedH) {
+      document.documentElement.style.setProperty('--timeline-height', `${savedH}px`);
+      lowerTimeline.style.height = `${savedH}px`;
+    }
     
     let isDragging = false;
     splTl.addEventListener('mousedown', (e) => {
@@ -206,7 +277,10 @@ function initSplitters() {
     });
     window.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
-      const newH = Math.max(160, Math.min(window.innerHeight * 0.7, window.innerHeight - e.clientY));
+      const minH = 180;
+      const maxH = Math.round(window.innerHeight * 0.55);
+      const newH = Math.max(minH, Math.min(maxH, window.innerHeight - e.clientY));
+      document.documentElement.style.setProperty('--timeline-height', `${newH}px`);
       lowerTimeline.style.height = `${newH}px`;
       localStorage.setItem('capcut_timeline_height', newH);
     });
@@ -219,6 +293,49 @@ function initSplitters() {
     });
   }
 }
+
+// Drawer Controls (Responsive <= 1280px / <= 1024px)
+function toggleInspectorDrawer(force) {
+  const inspector = document.getElementById('panelDetails');
+  if (!inspector) return;
+  const isCurrentlyOpen = inspector.classList.contains('drawer-open');
+  const shouldOpen = force !== undefined ? force : !isCurrentlyOpen;
+  inspector.classList.toggle('drawer-open', shouldOpen);
+  if (shouldOpen) {
+    trapModalFocus(inspector);
+  } else {
+    releaseModalFocus();
+  }
+}
+
+function toggleAssetDrawer(force) {
+  const panel = document.getElementById('panelAssets');
+  if (!panel) return;
+  const isCurrentlyOpen = panel.classList.contains('drawer-open');
+  const shouldOpen = force !== undefined ? force : !isCurrentlyOpen;
+  panel.classList.toggle('drawer-open', shouldOpen);
+  if (shouldOpen) {
+    trapModalFocus(panel);
+  } else {
+    releaseModalFocus();
+  }
+}
+
+function toggleHeaderMoreMenu(e) {
+  if (e) e.stopPropagation();
+  const dropdown = document.getElementById('headerMoreDropdown');
+  if (!dropdown) return;
+  const isVisible = dropdown.style.display === 'flex';
+  dropdown.style.display = isVisible ? 'none' : 'flex';
+}
+
+window.addEventListener('click', (e) => {
+  const moreWrap = document.getElementById('headerMoreWrap');
+  const dropdown = document.getElementById('headerMoreDropdown');
+  if (dropdown && moreWrap && !moreWrap.contains(e.target)) {
+    dropdown.style.display = 'none';
+  }
+});
 
 // Bật/tắt gập Inspector phải
 function toggleInspectorFold() {
@@ -635,6 +752,7 @@ function renderTracks() {
       const clip = document.createElement('div');
       clip.className = 'timeline-clip';
       clip.dataset.segId = seg.id;
+      clip.dataset.id = seg.id;
       clip.dataset.trackIdx = tIdx;
       
       const leftPx = (seg.start_us / 1000000) * pxPerSec;
@@ -668,7 +786,7 @@ function renderTracks() {
       topBar.className = 'clip-top-bar';
       const iconMap = { video: '🎬', audio: '🎵', text: '🔤', effect: '✨', sticker: '🏷️' };
       const icon = iconMap[track.type] || '📦';
-      topBar.innerHTML = `<span style="font-size:10px;">${icon}</span><span class="clip-title-text" title="${esc(seg.label)}">${esc(seg.label)}</span>`;
+      topBar.innerHTML = `<span style="font-size:11px;">${icon}</span><span class="clip-title-text" title="${esc(seg.label)}">${esc(seg.label)}</span>`;
       clip.appendChild(topBar);
       
       // Bottom bar (Dur, Speed, Effects)
@@ -698,19 +816,22 @@ function renderTracks() {
       clip.appendChild(trimRight);
       
       // Click / Razor / Drag handling
+      clip.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
       clip.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
         if (track.locked) {
-          e.stopPropagation();
           return;
         }
         if (e.target.classList.contains('clip-trim-handle')) return;
         if (currentTool === 'razor') {
-          e.stopPropagation();
           splitSelectedAtPlayhead(seg.id);
           return;
         }
         
         // Start Drag
+        let hasMoved = false;
         isDraggingClip = true;
         dragStartX = e.clientX;
         dragOrigStartUs = seg.start_us;
@@ -719,6 +840,9 @@ function renderTracks() {
         const onMouseMove = (moveEvt) => {
           if (!isDraggingClip) return;
           const deltaX = moveEvt.clientX - dragStartX;
+          if (Math.abs(deltaX) > 2) {
+            hasMoved = true;
+          }
           const deltaUs = Math.round((deltaX / pxPerSec) * 1000000);
           const newStartUs = Math.max(0, dragOrigStartUs + deltaUs);
           clip.style.left = `${(newStartUs / 1000000) * pxPerSec}px`;
@@ -731,20 +855,22 @@ function renderTracks() {
             isDraggingClip = false;
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
-            // Save to server then re-render to sync state
-            await fetch('/api/update-clip', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                project_name: currentProject,
-                segment_id: seg.id,
-                start_us: seg.start_us
-              })
-            });
-            // Update internal projectData to match dragged position
-            for (const track of projectData.tracks) {
-              for (const s2 of track.segments) {
-                if (s2.id === seg.id) { s2.start_us = seg.start_us; break; }
+            if (hasMoved) {
+              // Save to server then re-render to sync state
+              await fetch('/api/update-clip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  project_name: currentProject,
+                  segment_id: seg.id,
+                  start_us: seg.start_us
+                })
+              });
+              // Update internal projectData to match dragged position
+              for (const track of projectData.tracks) {
+                for (const s2 of track.segments) {
+                  if (s2.id === seg.id) { s2.start_us = seg.start_us; break; }
+                }
               }
             }
           }
@@ -851,23 +977,21 @@ function updateInspectorFields(seg) {
   if (!seg) return;
   
   // 1. Header Info
-  const typeBadge = document.getElementById('inspTypeBadge');
-  const clipTitle = document.getElementById('inspClipName');
-  const trackBadge = document.getElementById('inspTrackBadge');
-  const timeRange = document.getElementById('inspTimeRange');
-  
   const type = seg.type || 'video';
-  typeBadge.textContent = type.toUpperCase();
-  typeBadge.className = `insp-type-badge badge-${type}`;
-  clipTitle.textContent = seg.label || 'Không tên';
+  const typeBadge = document.getElementById('inspTypeBadge');
+  if (typeBadge) {
+    typeBadge.textContent = type.toUpperCase();
+    typeBadge.className = `insp-type-badge badge-${type}`;
+  }
+  setText('inspClipName', seg.label || 'Không tên');
   
   const tIdx = seg.trackIndex !== undefined ? seg.trackIndex : (seg.track_index !== undefined ? seg.track_index : 0);
-  trackBadge.textContent = `Track ${tIdx} (${type})`;
+  setText('inspTrackBadge', `Track ${tIdx} (${type})`);
   
   const sSec = (seg.start_us / 1e6).toFixed(2);
   const dSec = (seg.duration_us / 1e6).toFixed(2);
   const eSec = (seg.end_us ? seg.end_us / 1e6 : (seg.start_us + seg.duration_us) / 1e6).toFixed(2);
-  timeRange.textContent = `${sSec}s ➔ ${eSec}s (${dSec}s)`;
+  setText('inspTimeRange', `${sSec}s ➔ ${eSec}s (${dSec}s)`);
   
   // 2. Sections Visibility based on Clip Type
   const textFieldWrap = document.getElementById('textFieldWrap');
@@ -877,45 +1001,44 @@ function updateInspectorFields(seg) {
   const scaleFieldWrap = document.getElementById('scaleFieldWrap');
   
   if (type === 'text') {
-    textFieldWrap.style.display = 'flex';
-    document.getElementById('inspTextInput').value = seg.details?.text || seg.label || '';
-    mediaPathWrap.style.display = 'none';
-    volumeFieldWrap.style.display = 'none';
-    speedFieldWrap.style.display = 'none';
-    scaleFieldWrap.style.display = 'none';
+    if (textFieldWrap) textFieldWrap.style.display = 'flex';
+    setVal('inspTextInput', seg.details?.text || seg.label || '');
+    if (mediaPathWrap) mediaPathWrap.style.display = 'none';
+    if (volumeFieldWrap) volumeFieldWrap.style.display = 'none';
+    if (speedFieldWrap) speedFieldWrap.style.display = 'none';
+    if (scaleFieldWrap) scaleFieldWrap.style.display = 'none';
   } else if (type === 'video') {
-    textFieldWrap.style.display = 'none';
-    mediaPathWrap.style.display = 'flex';
-    document.getElementById('inspMediaPath').textContent = seg.media_path || seg.details?.path || 'Chưa liên kết đường dẫn tệp';
-    volumeFieldWrap.style.display = 'flex';
-    speedFieldWrap.style.display = 'flex';
-    scaleFieldWrap.style.display = 'flex';
+    if (textFieldWrap) textFieldWrap.style.display = 'none';
+    if (mediaPathWrap) mediaPathWrap.style.display = 'flex';
+    setText('inspMediaPath', seg.media_path || seg.details?.path || 'Chưa liên kết đường dẫn tệp');
+    if (volumeFieldWrap) volumeFieldWrap.style.display = 'flex';
+    if (speedFieldWrap) speedFieldWrap.style.display = 'flex';
+    if (scaleFieldWrap) scaleFieldWrap.style.display = 'flex';
   } else if (type === 'audio') {
-    textFieldWrap.style.display = 'none';
-    mediaPathWrap.style.display = 'flex';
-    document.getElementById('inspMediaPath').textContent = seg.media_path || seg.details?.path || 'Tệp âm thanh nội bộ';
-    volumeFieldWrap.style.display = 'flex';
-    speedFieldWrap.style.display = 'flex';
-    scaleFieldWrap.style.display = 'none';
+    if (textFieldWrap) textFieldWrap.style.display = 'none';
+    if (mediaPathWrap) mediaPathWrap.style.display = 'flex';
+    setText('inspMediaPath', seg.media_path || seg.details?.path || 'Tệp âm thanh nội bộ');
+    if (volumeFieldWrap) volumeFieldWrap.style.display = 'flex';
+    if (speedFieldWrap) speedFieldWrap.style.display = 'flex';
+    if (scaleFieldWrap) scaleFieldWrap.style.display = 'none';
   } else {
     // Sticker, effect, filter
-    textFieldWrap.style.display = 'none';
-    mediaPathWrap.style.display = 'none';
-    volumeFieldWrap.style.display = 'none';
-    speedFieldWrap.style.display = 'none';
-    scaleFieldWrap.style.display = type === 'sticker' ? 'flex' : 'none';
+    if (textFieldWrap) textFieldWrap.style.display = 'none';
+    if (mediaPathWrap) mediaPathWrap.style.display = 'none';
+    if (volumeFieldWrap) volumeFieldWrap.style.display = 'none';
+    if (speedFieldWrap) speedFieldWrap.style.display = 'none';
+    if (scaleFieldWrap) scaleFieldWrap.style.display = type === 'sticker' ? 'flex' : 'none';
   }
   
   // 3. Timings
-  document.getElementById('inspStartTime').value = sSec;
-  document.getElementById('inspDuration').value = dSec;
+  setVal('inspStartTime', sSec);
+  setVal('inspDuration', dSec);
   
   // 4. Volume Slider
   const volPercent = Math.round((seg.volume !== undefined ? seg.volume : 1.0) * 100);
   const slider = document.getElementById('inspVolumeSlider');
   if (slider) slider.value = volPercent;
-  const volLabel = document.getElementById('inspVolumeVal');
-  if (volLabel) volLabel.textContent = `${volPercent}%`;
+  setText('inspVolumeVal', `${volPercent}%`);
   
   // 5. Speed Buttons
   const curSpeed = seg.speed !== undefined ? seg.speed : 1.0;
@@ -1108,7 +1231,6 @@ async function setClipScale(scaleVal) {
   });
 }
 
-// 7. Tab Switching (Assets & Details)
 function switchNavRail(tabId, el) {
   document.querySelectorAll('.rail-item').forEach(r => r.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -1126,6 +1248,11 @@ function switchNavRail(tabId, el) {
   document.querySelectorAll('.tab-pane, .asset-tab-pane').forEach(p => p.classList.remove('active'));
   const target = document.getElementById(`pane-${tabId}`);
   if (target) target.classList.add('active');
+
+  // Mở drawer thư viện nếu ở màn hình <= 1024px
+  if (window.innerWidth <= 1024) {
+    toggleAssetDrawer(true);
+  }
 }
 
 function switchAssetTab(tabId, clickedEl) {
@@ -1144,6 +1271,22 @@ function switchAssetTab(tabId, clickedEl) {
     document.querySelectorAll('.rail-item').forEach(r => r.classList.remove('active'));
     railBtn.classList.add('active');
   }
+}
+
+// Lọc tài nguyên thư viện theo từ khóa tìm kiếm
+function filterAssets(query) {
+  const q = (query || '').toLowerCase().trim();
+  const mediaCards = document.querySelectorAll('#mediaGrid .media-card');
+  mediaCards.forEach(card => {
+    const title = (card.querySelector('.media-name')?.textContent || '').toLowerCase();
+    card.style.display = (!q || title.includes(q)) ? '' : 'none';
+  });
+  
+  const presetCards = document.querySelectorAll('#panelAssets .preset-card, #panelAssets .fx-item');
+  presetCards.forEach(card => {
+    const text = (card.textContent || '').toLowerCase();
+    card.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
 }
 
 function setCanvasAspect(aspectRatio, el) {
@@ -1222,6 +1365,7 @@ function setupTimelineInteractions() {
   
   container.addEventListener('click', (e) => {
     if (isDraggingClip) return;
+    if (e.target.closest('.timeline-clip')) return;
     const rect = container.getBoundingClientRect();
     const headerWidth = getTimelineHeaderOffset();
     const clickX = e.clientX - rect.left + container.scrollLeft - headerWidth;
@@ -1700,25 +1844,33 @@ async function openQAModal() {
     
     const dial = document.getElementById('qaScoreDial');
     dial.textContent = data.score;
-    dial.style.borderColor = data.score >= 80 ? '#10b981' : (data.score >= 60 ? '#f59e0b' : '#ef4444');
-    dial.style.color = dial.style.borderColor;
+    const isPass = data.status === 'PASS';
+    const isCrit = data.status === 'CRITICAL' || (data.critical_count && data.critical_count > 0);
+    const col = isPass ? '#10b981' : (isCrit ? '#ef4444' : '#f59e0b');
+    dial.style.borderColor = col;
+    dial.style.color = col;
     
-    document.getElementById('qaScoreStatus').textContent = data.status === 'PASS' ? 'ĐẠT CHUẨN (PASS)' : 'CẦN TỐI ƯU (WARNING)';
-    document.getElementById('qaScoreStatus').style.color = dial.style.borderColor;
+    const statusText = isPass ? 'ĐẠT CHUẨN (PASS)' : (isCrit ? 'LỖI NGHIÊM TRỌNG (CRITICAL)' : 'CẦN TỐI ƯU (WARNING)');
+    setText('qaScoreStatus', statusText);
+    const stEl = document.getElementById('qaScoreStatus');
+    if (stEl) stEl.style.color = col;
+    
+    setText('qaScoreSub', `Tổng số vấn đề: ${data.total_issues || 0} (${data.groups_count || 0} nhóm vi phạm) · Điểm: ${data.score}/100`);
     
     const list = document.getElementById('qaIssuesList');
     list.innerHTML = '';
     
-    if (data.issues.length === 0) {
+    if (!data.issues || data.issues.length === 0) {
       list.innerHTML = '<div style="color: #10b981; text-align: center; padding: 20px;">✓ Không phát hiện lỗi chất lượng nào! Video đã đạt chuẩn thương mại.</div>';
     } else {
       data.issues.forEach(iss => {
         const item = document.createElement('div');
         item.className = 'qa-issue-item';
+        const isCritIss = iss.severity === 'CRITICAL';
         item.innerHTML = `
           <div class="qa-issue-header">
-            <span class="issue-type">${esc(iss.type)}</span>
-            <span class="issue-badge">${esc(iss.severity)}</span>
+            <span class="issue-type">${esc(iss.type)} (${iss.count || 1} vị trí)</span>
+            <span class="issue-badge" style="background:${isCritIss ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}; color:${isCritIss ? '#ef4444' : '#f59e0b'}; border:1px solid ${isCritIss ? '#ef4444' : '#f59e0b'};">${esc(iss.severity)}</span>
           </div>
           <div class="issue-msg">${esc(iss.message)}</div>
           <div class="issue-action">Đề xuất: ${esc(iss.fix_action)}</div>
@@ -1799,17 +1951,30 @@ function renderMediaTab() {
         
         const ext = (s.media_path.split('.').pop() || 'mp4').toUpperCase();
         const isVideo = ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'].includes(ext);
+        const isAudio = (t.type === 'audio') || ['MP3', 'WAV', 'AAC', 'M4A', 'FLAC', 'OGG', 'WMA'].includes(ext);
         const streamUrl = `/api/media?path=${encodeURIComponent(s.media_path)}`;
         const durSec = ((s.end_us - s.start_us) / 1e6).toFixed(1);
         
+        let thumbHtml = '';
+        if (isVideo) {
+          thumbHtml = `
+            <video src="${streamUrl}" preload="metadata" muted class="thumb-video" onloadedmetadata="this.currentTime=1" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';"></video>
+            <div class="thumb-fallback" style="display:none;">🎬</div>
+          `;
+        } else if (isAudio) {
+          thumbHtml = `
+            <div class="thumb-audio" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; font-size:28px; background:rgba(22,101,52,0.25); color:#4ade80;">🎵</div>
+          `;
+        } else {
+          thumbHtml = `
+            <img src="${streamUrl}" class="thumb-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+            <div class="thumb-fallback" style="display:none;">🖼️</div>
+          `;
+        }
+        
         card.innerHTML = `
           <div class="media-thumb">
-            ${isVideo
-              ? `<video src="${streamUrl}" preload="metadata" muted class="thumb-video" onloadedmetadata="this.currentTime=1" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';"></video>
-                 <div class="thumb-fallback" style="display:none;">🎬</div>`
-              : `<img src="${streamUrl}" class="thumb-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
-                 <div class="thumb-fallback" style="display:none;">🖼️</div>`
-            }
+            ${thumbHtml}
             <div class="media-play-overlay">▶</div>
             <span class="media-badge-dur">${durSec}s</span>
             <span class="media-badge-ext">${esc(ext)}</span>
@@ -1925,15 +2090,7 @@ function handleZoom(val) {
   }
 }
 
-function fitTimeline() {
-  handleZoom(100);
-  document.getElementById('zoomSlider').value = 100;
-}
 
-function toggleSafeGuide() {
-  const guide = document.getElementById('tiktokSafeGuide');
-  guide.style.display = guide.style.display === 'none' ? 'flex' : 'none';
-}
 
 function formatTimecode(us) {
   const totalSec = us / 1000000;
@@ -1965,7 +2122,7 @@ function releaseModalFocus() {
 }
 
 function closeAllModals() {
-  const modals = document.querySelectorAll('.qa-modal-overlay, .ai-modal-overlay, .mcp-modal-overlay, .agent-cockpit-overlay');
+  const modals = document.querySelectorAll('.qa-modal-overlay, .ai-modal-overlay, .mcp-modal-overlay, .agent-cockpit-overlay, .shortcuts-modal-overlay');
   modals.forEach(m => m.classList.remove('open', 'active'));
   releaseModalFocus();
 }
@@ -1974,7 +2131,7 @@ function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     const target = e.target;
     const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
-    const activeModal = document.querySelector('.qa-modal-overlay.open, .ai-modal-overlay.open, .mcp-modal-overlay.open, .mcp-modal-overlay.active, .agent-cockpit-overlay.open');
+    const activeModal = document.querySelector('.qa-modal-overlay.open, .ai-modal-overlay.open, .mcp-modal-overlay.open, .mcp-modal-overlay.active, .agent-cockpit-overlay.open, .shortcuts-modal-overlay.open, .shortcuts-modal-overlay.active');
     
     // Xử lý Focus Trap bằng phím Tab khi modal đang mở
     if (activeModal && e.key === 'Tab') {
@@ -1997,8 +2154,15 @@ function setupKeyboardShortcuts() {
       }
     }
 
-    // Nếu modal đang mở hoặc đang gõ input: Esc đóng modal / blur input
+    // Nếu modal đang mở hoặc đang gõ input hoặc drawer đang mở: Esc đóng modal / drawer / blur input
     if (e.key === 'Escape') {
+      const openDrawer = document.querySelector('.inspector.drawer-open, .asset-panel.drawer-open');
+      if (openDrawer) {
+        e.preventDefault();
+        openDrawer.classList.remove('drawer-open');
+        releaseModalFocus();
+        return;
+      }
       if (activeModal) {
         e.preventDefault();
         closeAllModals();
@@ -2242,7 +2406,7 @@ function renderErrorList(category = 'all') {
           <div class="err-single-row" data-err-id="${esc(item.id)}" data-time="${item.target_time_us || item.start_us}" data-seg-id="${esc(item.segment_id || '')}">
             <span class="err-row-time">${formatTimecode(item.start_us)}</span>
             <span class="err-row-desc" title="${esc(item.description)}">${esc(item.description)}</span>
-            ${!item.isFixed ? `<button class="btn-fix-single" type="button" data-fix-id="${esc(item.id)}">Sửa</button>` : `<span style="color:var(--color-success);font-size:10px;">✓</span>`}
+            ${!item.isFixed ? `<button class="btn-fix-single" type="button" data-fix-id="${esc(item.id)}">Sửa</button>` : `<span style="color:var(--color-success);font-size:12px;">✓</span>`}
           </div>
         `).join('')}
       </div>
@@ -2376,16 +2540,25 @@ function flashBoundingBox(errId) {
 }
 
 function toggleBBoxOverlay() {
-  const chk = document.getElementById('btnToggleBBox');
-  showBBoxOverlay = chk ? chk.checked : !showBBoxOverlay;
+  const btn = document.getElementById('btnToggleBBox');
+  showBBoxOverlay = !showBBoxOverlay;
+  if (btn) {
+    btn.classList.toggle('active', showBBoxOverlay);
+    btn.setAttribute('aria-pressed', showBBoxOverlay ? 'true' : 'false');
+  }
   renderActiveBoundingBoxes(currentPlayheadUs);
 }
 
 function toggleSafeGuide() {
   const guide = document.getElementById('tiktokSafeGuide');
-  const chk = document.getElementById('btnToggleSafeGuide');
-  const isVis = chk ? chk.checked : !guide.classList.contains('visible');
-  if (guide) guide.classList.toggle('visible', isVis);
+  const btn = document.getElementById('btnToggleSafeGuide');
+  if (!guide) return;
+  const isNowVisible = !guide.classList.contains('visible');
+  guide.classList.toggle('visible', isNowVisible);
+  if (btn) {
+    btn.classList.toggle('active', isNowVisible);
+    btn.setAttribute('aria-pressed', isNowVisible ? 'true' : 'false');
+  }
 }
 
 // 16. Timeline Ruler Error Markers: Nhỏ 6px nằm ở lane riêng dưới thước số
@@ -2874,13 +3047,13 @@ async function runFootageAnalysisFromInput() {
 }
 
 function renderDiagnosticResults(data) {
-  const { summary, proposals, files } = data;
+  const { summary = {}, proposals = [], files = [] } = data || {};
   
-  // 1. Update Counters
-  document.getElementById('diagTotalScanned').textContent = summary.total_scanned || 0;
-  document.getElementById('diagTotalApproved').textContent = summary.approved_count || 0;
-  document.getElementById('diagTotalWarning').textContent = summary.warning_count || 0;
-  document.getElementById('diagTotalRejected').textContent = summary.rejected_count || 0;
+  // 1. Update Counters safely
+  setText('diagTotalScanned', summary.total_scanned ?? 0);
+  setText('diagTotalApproved', summary.approved_count ?? 0);
+  setText('diagTotalWarning', summary.warning_count ?? 0);
+  setText('diagTotalRejected', summary.rejected_count ?? 0);
   
   const badBadge = document.getElementById('mcpBadgeBadClips');
   if (badBadge) {

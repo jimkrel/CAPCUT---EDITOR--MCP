@@ -591,7 +591,7 @@ def get_project(project_name: str):
                     "sticker": "Nhãn dán"
                 }
                 fallback_label = type_labels.get(track_type, "Clip")
-                fallback_color = "#2d6cdf" if track_type == "video" else ("#258352" if track_type == "audio" else "#cf8a28")
+                fallback_color = "#1e40af" if track_type == "video" else ("#166534" if track_type == "audio" else "#b45309")
                 parsed_segments.append({
                     "id": s.get("id", "?"),
                     "material_id": s.get("material_id", ""),
@@ -623,22 +623,29 @@ def get_project(project_name: str):
         })
         
     # Second pass: assign sequential human-readable labels (V1, V2, A1, T1, FX1...)
-    v_count, a_count, t_count, fx_count, st_count = 1, 1, 1, 1, 1
+    v_count, a_count, t_count, fx_count, st_count = 0, 0, 0, 0, 0
     for pt in parsed_tracks:
         ttype = pt["type"]
         if ttype == "video":
-            if pt["is_main"]:
+            v_count += 1
+            if v_count == 1:
                 pt["label"] = "V1 (Chính)"
+                pt["is_main"] = True
             else:
-                v_count += 1
                 pt["label"] = f"V{v_count} (Lớp phủ)"
+                pt["is_main"] = False
         elif ttype == "audio":
-            if pt["flag"] == 1 or len([s for s in pt["segments"] if s["duration_us"] > 20_000_000]) > 0:
-                pt["label"] = f"A{a_count} (BGM/Nhạc)"
-            else:
-                pt["label"] = f"A{a_count} (Thoại)"
             a_count += 1
+            # Tín hiệu đáng tin cậy: tên material hoặc cờ flag
+            labels_concat = " ".join([s.get("label", "").lower() for s in pt["segments"]] + [s.get("media_path", "").lower() for s in pt["segments"]])
+            if pt["flag"] == 1 or any(k in labels_concat for k in ["bgm", "music", "nhac", "soundtrack"]):
+                pt["label"] = f"A{a_count} (BGM)"
+            elif any(k in labels_concat for k in ["voice", "thoai", "speech", "mic", "vj"]):
+                pt["label"] = f"A{a_count} (Thoại)"
+            else:
+                pt["label"] = f"A{a_count}"
         elif ttype == "text":
+            t_count += 1
             if pt["flag"] == 1:
                 pt["label"] = f"T{t_count} (Phụ đề)"
             else:
@@ -808,7 +815,7 @@ def update_clip(req: UpdateClipRequest):
     recalculate_project_duration(data)
     save_draft_with_history(draft_file, data)
         
-    return {"status": "success", "message": "Clip updated successfully"}
+    return {"status": "success", "message": "Cập nhật clip thành công"}
 
 @app.post("/api/split-clip")
 def split_clip(req: CommandRequest):
@@ -828,80 +835,87 @@ def split_clip(req: CommandRequest):
                 start = tr.get("start", 0)
                 dur = tr.get("duration", 0)
                 end = start + dur
-                if start < split_us < end:
-                    # Split into 2 segments
-                    left_dur = split_us - start
-                    right_dur = end - split_us
-                    tr["duration"] = left_dur
+                
+                # Nếu playhead không nằm hoàn toàn giữa clip (ví dụ ở mép đầu/cuối), tự động cắt ở điểm giữa clip
+                if not (start < split_us < end):
+                    if dur > 200_000:
+                        split_us = start + dur // 2
+                    else:
+                        return {"status": "error", "message": "Playhead phải nằm bên trong clip để cắt đôi"}
+                
+                # Split into 2 segments
+                left_dur = split_us - start
+                right_dur = end - split_us
+                tr["duration"] = left_dur
+                
+                new_seg = json.loads(json.dumps(s))
+                new_seg["id"] = str(uuid.uuid4()).upper()
+                if "target_timerange" not in new_seg:
+                    new_seg["target_timerange"] = {}
+                new_seg["target_timerange"]["start"] = split_us
+                new_seg["target_timerange"]["duration"] = right_dur
+                
+                # Fix: Synchronize source_timerange for video and audio
+                if s.get("source_timerange"):
+                    speed = s.get("speed", 1.0) or 1.0
+                    src_start = s["source_timerange"].get("start", 0)
+                    src_dur = s["source_timerange"].get("duration", 0)
+                    left_src_dur = int(round(left_dur * speed))
+                    s["source_timerange"]["duration"] = left_src_dur
+                    if "source_timerange" not in new_seg:
+                        new_seg["source_timerange"] = {}
+                    new_seg["source_timerange"]["start"] = src_start + left_src_dur
+                    new_seg["source_timerange"]["duration"] = max(100_000, src_dur - left_src_dur)
                     
-                    new_seg = json.loads(json.dumps(s))
-                    new_seg["id"] = str(uuid.uuid4()).upper()
-                    if "target_timerange" not in new_seg:
-                        new_seg["target_timerange"] = {}
-                    new_seg["target_timerange"]["start"] = split_us
-                    new_seg["target_timerange"]["duration"] = right_dur
-                    
-                    # Fix: Synchronize source_timerange for video and audio
-                    if s.get("source_timerange"):
-                        speed = s.get("speed", 1.0) or 1.0
-                        src_start = s["source_timerange"].get("start", 0)
-                        src_dur = s["source_timerange"].get("duration", 0)
-                        left_src_dur = int(round(left_dur * speed))
-                        s["source_timerange"]["duration"] = left_src_dur
-                        if "source_timerange" not in new_seg:
-                            new_seg["source_timerange"] = {}
-                        new_seg["source_timerange"]["start"] = src_start + left_src_dur
-                        new_seg["source_timerange"]["duration"] = max(100_000, src_dur - left_src_dur)
-                        
-                    # Clone material theo từng segment với id mới cho extra_material_refs
-                    new_extra_refs = []
-                    for ref_id in (s.get("extra_material_refs") or []):
-                        new_ref_id = str(uuid.uuid4()).upper()
-                        cloned = False
-                        for mat_cat in ["video_effects", "material_animations", "speeds", "transitions", "stickers"]:
-                            cat_list = materials.get(mat_cat) or []
-                            for mat_item in cat_list:
-                                if mat_item.get("id") == ref_id:
-                                    cloned_item = json.loads(json.dumps(mat_item))
-                                    cloned_item["id"] = new_ref_id
-                                    cat_list.append(cloned_item)
-                                    cloned = True
-                                    break
-                            if cloned:
+                # Clone material theo từng segment với id mới cho extra_material_refs
+                new_extra_refs = []
+                for ref_id in (s.get("extra_material_refs") or []):
+                    new_ref_id = str(uuid.uuid4()).upper()
+                    cloned = False
+                    for mat_cat in ["video_effects", "material_animations", "speeds", "transitions", "stickers"]:
+                        cat_list = materials.get(mat_cat) or []
+                        for mat_item in cat_list:
+                            if mat_item.get("id") == ref_id:
+                                cloned_item = json.loads(json.dumps(mat_item))
+                                cloned_item["id"] = new_ref_id
+                                cat_list.append(cloned_item)
+                                cloned = True
                                 break
-                        new_extra_refs.append(new_ref_id if cloned else ref_id)
-                    new_seg["extra_material_refs"] = new_extra_refs
+                        if cloned:
+                            break
+                    new_extra_refs.append(new_ref_id if cloned else ref_id)
+                new_seg["extra_material_refs"] = new_extra_refs
+                
+                # Chia lại keyframe theo thời gian cắt
+                if s.get("keyframe_list"):
+                    old_kfs = s.get("keyframe_list") or []
+                    left_kfs = []
+                    right_kfs = []
+                    for kf in old_kfs:
+                        time_offset = kf.get("time_offset", 0)
+                        if time_offset <= left_dur:
+                            left_kfs.append(kf)
+                        else:
+                            new_kf = json.loads(json.dumps(kf))
+                            new_kf["id"] = str(uuid.uuid4()).upper()
+                            new_kf["time_offset"] = max(0, time_offset - left_dur)
+                            right_kfs.append(new_kf)
+                    s["keyframe_list"] = left_kfs
+                    new_seg["keyframe_list"] = right_kfs
                     
-                    # Chia lại keyframe theo thời gian cắt
-                    if s.get("keyframe_list"):
-                        old_kfs = s.get("keyframe_list") or []
-                        left_kfs = []
-                        right_kfs = []
-                        for kf in old_kfs:
-                            time_offset = kf.get("time_offset", 0)
-                            if time_offset <= left_dur:
-                                left_kfs.append(kf)
-                            else:
-                                new_kf = json.loads(json.dumps(kf))
-                                new_kf["id"] = str(uuid.uuid4()).upper()
-                                new_kf["time_offset"] = max(0, time_offset - left_dur)
-                                right_kfs.append(new_kf)
-                        s["keyframe_list"] = left_kfs
-                        new_seg["keyframe_list"] = right_kfs
-                        
-                    track["segments"].insert(idx + 1, new_seg)
-                    found = True
-                    break
+                track["segments"].insert(idx + 1, new_seg)
+                found = True
+                break
         if found:
             break
         
     if not found:
-        return {"status": "error", "message": "Playhead must be inside the selected clip to split"}
+        return {"status": "error", "message": "Playhead phải nằm bên trong clip để cắt đôi"}
         
     recalculate_project_duration(data)
     save_draft_with_history(draft_file, data)
         
-    return {"status": "success", "message": f"Split clip successfully at {split_us/1e6:.2f}s"}
+    return {"status": "success", "message": f"Đã cắt clip tại {split_us/1e6:.2f}s"}
 
 @app.post("/api/delete-clip")
 def delete_clip(req: CommandRequest):
@@ -919,88 +933,65 @@ def delete_clip(req: CommandRequest):
             break
             
     if not deleted:
-        return {"status": "error", "message": "Clip not found to delete"}
+        return {"status": "error", "message": "Không tìm thấy clip để xóa"}
         
     clean_orphan_materials(data)
     recalculate_project_duration(data)
     save_draft_with_history(draft_file, data)
         
-    return {"status": "success", "message": "Clip deleted successfully"}
+    return {"status": "success", "message": "Đã xóa clip thành công"}
 
 @app.get("/api/quality-audit/{project_name}")
 def quality_audit(project_name: str):
-    draft_file = get_draft_file(project_name)
-        
-    with open(draft_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
-    issues = []
-    score = 100
+    scan_res = scan_project_errors(project_name)
+    errors = scan_res.get("errors", [])
     
-    # 1. Audit Safe Zone
-    unsafe_texts = 0
-    texts = data.get("materials", {}).get("texts", [])
-    for track in data.get("tracks", []):
-        if track.get("type") == "text":
-            for s in track.get("segments", []):
-                clip_m = s.get("clip") or {}
-                tf_m = clip_m.get("transform") or {}
-                y = tf_m.get("y", 0)
-                if y < -0.45:
-                    unsafe_texts += 1
-    if unsafe_texts > 0:
-        score -= 15
+    # Gom nhóm theo type để tạo danh sách issues thống nhất
+    grouped = {}
+    for err in errors:
+        t = err.get("type", "UNKNOWN")
+        if t not in grouped:
+            grouped[t] = {
+                "type": t,
+                "severity": err.get("severity", "WARNING"),
+                "title": err.get("title", ""),
+                "items": [],
+                "fix_action": err.get("fix_command", "Tự động tối ưu qua AI Agent")
+            }
+        grouped[t]["items"].append(err)
+        if err.get("severity") == "CRITICAL":
+            grouped[t]["severity"] = "CRITICAL"
+            
+    issues = []
+    for t, grp in grouped.items():
+        count = len(grp["items"])
+        sev = grp["severity"]
+        title = grp["title"]
         issues.append({
-            "type": "SAFE_ZONE_VIOLATION",
-            "severity": "WARNING",
-            "message": f"{unsafe_texts} phụ đề nằm quá sát đáy (dưới -0.45) nguy cơ bị caption TikTok che",
-            "fix_action": "Kéo toàn bộ về y = -0.404"
+            "type": t,
+            "severity": sev,
+            "count": count,
+            "message": f"Phát hiện {count} vị trí vi phạm: {title}",
+            "fix_action": grp["fix_action"]
         })
         
-    # 2. Audit Subtitle Word Length (Single line rule)
-    long_texts = 0
-    for t in texts:
-        try:
-            c_obj = json.loads(t.get("content", "{}"))
-        except (json.JSONDecodeError, TypeError):
-            continue
-        txt = c_obj.get("text", "")
-        if len(txt.split()) > 10:
-            long_texts += 1
-    if long_texts > 0:
-        score -= 10
-        issues.append({
-            "type": "SUBTITLE_OVERFLOW",
-            "severity": "WARNING",
-            "message": f"{long_texts} phụ đề dài quá 10 từ, nguy cơ tràn thành 3 dòng che sản phẩm",
-            "fix_action": "Bẻ đôi câu phụ đề dài"
-        })
-
-    # 3. Audit Dead Outro
-    total_dur = data.get("duration", 0)
-    max_voice = 0
-    for track in data.get("tracks", []):
-        if track.get("type") in ["audio", "text"]:
-            for s in track.get("segments", []):
-                tr = s.get("target_timerange") or {}
-                end = tr.get("start", 0) + tr.get("duration", 0)
-                if end > max_voice: max_voice = end
-                
-    if total_dur > max_voice + 1_500_000 and max_voice > 0:
-        excess_sec = (total_dur - max_voice) / 1e6
-        score -= 20
-        issues.append({
-            "type": "DEAD_OUTRO",
-            "severity": "CRITICAL",
-            "message": f"Phát hiện đuôi video chết dài {excess_sec:.1f}s sau khi dứt lời thoại (nguy cơ tụt retention)",
-            "fix_action": f"Cắt cụt timeline tại { (max_voice+400000)/1e6:.2f}s"
-        })
-
+    crit_count = scan_res.get("critical_count", 0)
+    score = scan_res.get("health_score", 100)
+    
+    # Quy tắc C1: Điểm số không được hiện "ĐẠT CHUẨN" khi còn cảnh báo CRITICAL
+    if crit_count > 0:
+        status = "CRITICAL" if score < 60 else "WARNING"
+    else:
+        status = "PASS" if score >= 85 else ("WARNING" if score >= 60 else "POOR")
+        
     return {
         "project_name": project_name,
-        "score": max(20, score),
-        "status": "PASS" if score >= 85 else ("WARNING" if score >= 60 else "POOR"),
-        "total_issues": len(issues),
+        "score": score,
+        "status": status,
+        "total_issues": len(errors),
+        "groups_count": len(issues),
+        "critical_count": crit_count,
+        "warning_count": scan_res.get("warning_count", 0),
         "issues": issues
     }
 
@@ -1860,12 +1851,29 @@ class ScriptParseRequest(BaseModel):
 @app.post("/api/ai-agent/analyze-footage-folder")
 def api_analyze_footage_folder(req: FootageFolderAnalysisRequest):
     # Validate folder path an toàn
-    valid_folder = validate_folder_path(req.folder_path)
+    try:
+        valid_folder = validate_folder_path(req.folder_path)
+    except HTTPException as he:
+        return JSONResponse(
+            status_code=he.status_code,
+            content={"status": "error", "message": he.detail, "detail": he.detail}
+        )
     try:
         import footage_analyzer
-        return footage_analyzer.scan_and_analyze_folder(str(valid_folder), max_files=req.max_files or 20)
+        res = footage_analyzer.scan_and_analyze_folder(str(valid_folder), max_files=req.max_files or 20)
+        if not res.get("ok"):
+            err_msg = res.get("error") or "Không thể quét thư mục footage"
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": err_msg, "detail": err_msg}
+            )
+        return res
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi phân tích footage: {str(e)}")
+        err_msg = f"Lỗi phân tích footage: {str(e)}"
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": err_msg, "detail": err_msg}
+        )
 
 @app.post("/api/ai-agent/parse-script")
 def api_parse_script(req: ScriptParseRequest):

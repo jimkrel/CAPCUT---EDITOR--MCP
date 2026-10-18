@@ -85,12 +85,15 @@ button:disabled {
 }
 
 .editor-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr) 5px var(--timeline-height, clamp(200px, 32vh, 340px));
+  grid-template-columns: 100%;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   background: var(--bg);
   overflow: hidden;
+  position: relative;
 }
 
 /* ==========================================================================
@@ -145,10 +148,12 @@ button:disabled {
   color: #d9dce5;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 6px 12px;
+  padding: 4px 12px;
   min-width: 200px;
+  min-height: 32px;
   background: #14161b;
   position: relative;
+  box-sizing: border-box;
 }
 
 .project-select select {
@@ -160,6 +165,9 @@ button:disabled {
   font-weight: 500;
   cursor: pointer;
   width: 100%;
+  min-height: 28px;
+  height: 28px;
+  line-height: 28px;
 }
 
 .project-select select option {
@@ -202,11 +210,25 @@ button:disabled {
   background: transparent;
   color: #a8adba;
   border-radius: 6px;
+  min-width: 28px;
+  min-height: 28px;
+  box-sizing: border-box;
 }
 
 .icon-button {
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+
+.transport-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
 }
 
 .icon-button:hover, .small-icon:hover, .transport-icon:hover, .help:hover {
@@ -307,23 +329,29 @@ button:disabled {
    WORKSPACE — 4 COLUMNS: RAIL (72px) | ASSETS (280px) | STAGE | INSPECTOR (280px)
    ========================================================================== */
 .workspace {
-  flex: 1;
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: grid;
-  grid-template-columns: 72px 280px minmax(460px, 1fr) 280px;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: 72px 280px minmax(320px, 1fr) 280px;
   background: var(--bg);
+  overflow: hidden;
+  position: relative;
 }
 
 /* CỘT 1: LEFT RAIL (72px) */
 .left-rail {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 14px 8px;
+  padding: 12px 8px;
   border-right: 1px solid var(--line);
   background: #0c0e12;
+  overflow-y: auto;
 }
 
 .rail-item {
@@ -374,15 +402,20 @@ button:disabled {
   line-height: 1;
 }
 
-/* CỘT 2: ASSET PANEL (280px) */
+/* CỘT 2: ASSET PANEL (280px) & CỘT 4: INSPECTOR */
 .asset-panel, .inspector {
   background: var(--panel);
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .asset-panel {
   border-right: 1px solid var(--line);
-  padding: 18px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
 }
@@ -480,8 +513,10 @@ button:disabled {
 
 .plus-btn {
   margin-left: auto;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   display: grid;
   place-items: center;
   border-radius: 6px;
@@ -1007,17 +1042,26 @@ button:disabled {
    ========================================================================== */
 .stage {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   background: #0c0e12;
+  overflow: hidden;
+  position: relative;
 }
 
 .stage-toolbar {
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  flex-shrink: 0;
 }
 
 .crumb {
@@ -1071,21 +1115,25 @@ button:disabled {
 .preview-wrap {
   flex: 1;
   min-height: 0;
-  display: grid;
-  place-items: center;
-  padding: 10px 24px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  overflow: hidden;
 }
 
 .preview {
   position: relative;
-  width: min(310px, 55%);
   aspect-ratio: 9/16;
+  height: 100%;
   max-height: 100%;
+  width: auto;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid #343945;
   border-radius: 11px;
   background: #151b22;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75);
 }
 
 .preview video {
@@ -1158,6 +1206,16 @@ button:disabled {
   z-index: 7;
 }
 
+.tiktok-safe-guide.visible {
+  display: flex;
+}
+
+#btnToggleSafeGuide.active, #btnToggleBBox.active {
+  background: var(--blue-subtle);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 .safe-tag {
   position: absolute;
   bottom: 80px;
@@ -1188,16 +1246,25 @@ button:disabled {
 
 /* Transport Bar */
 .transport {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px 14px;
+  padding: 0 16px;
   background: #0c0e12;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  z-index: 5;
+  flex-shrink: 0;
 }
 
 .transport-btn {
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1207,13 +1274,17 @@ button:disabled {
   transition: transform 0.1s ease, background 0.15s ease;
 }
 
+.splitter-vertical {
+  display: none !important;
+}
+
 .transport-btn:hover {
   background: #ffffff;
   transform: scale(1.05);
 }
 
 .timecode {
-  color: #bec5d2;
+  color: #f1f5f9;
   font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 600;
@@ -1221,7 +1292,7 @@ button:disabled {
 
 .timecode em {
   margin: 0 4px;
-  color: #596171;
+  color: #94a3b8;
   font-style: normal;
 }
 
@@ -1572,28 +1643,49 @@ button:disabled {
   background: #1e2330;
 }
 
+/* Splitter Horizontal */
+.splitter-horizontal {
+  height: 5px;
+  min-height: 5px;
+  max-height: 5px;
+  background: #1b1e26;
+  cursor: row-resize;
+  position: relative;
+  z-index: 30;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.splitter-horizontal:hover, .splitter-horizontal.active {
+  background: var(--blue);
+}
+
 /* ==========================================================================
-   TIMELINE (300px) — REF DESIGN EXACT
+   TIMELINE — CONTAINED GRID ROW
    ========================================================================== */
 .timeline {
-  height: 300px;
-  min-height: 240px;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   background: #0d0f13;
-  border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   z-index: 10;
+  position: relative;
 }
 
 .timeline-header {
-  height: 48px;
-  min-height: 48px;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line);
   background: #0d0f13;
+  flex-shrink: 0;
 }
 
 .timeline-label {
@@ -1609,8 +1701,10 @@ button:disabled {
 }
 
 .tiny-button {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   display: grid;
   place-items: center;
   border: 1px solid #343947;
@@ -1619,6 +1713,7 @@ button:disabled {
   background: #181b21;
   font-size: 12px;
   font-weight: 700;
+  box-sizing: border-box;
 }
 
 .tiny-button:hover {
@@ -1641,6 +1736,12 @@ button:disabled {
   color: #8b93a4;
   font-size: 11px;
   font-weight: 600;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .tb-btn.active {
@@ -1708,14 +1809,17 @@ button:disabled {
 }
 
 .btn-add-track-mini {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   display: grid;
   place-items: center;
   border-radius: 4px;
   background: #1e222b;
   color: #a6adba;
-  font-size: 11px;
+  font-size: 14px;
+  box-sizing: border-box;
 }
 
 .ruler-content-area {
@@ -2637,35 +2741,236 @@ button:disabled {
 }
 
 /* ==========================================================================
-   RESPONSIVE DESIGN — PRO BREAKPOINTS
+   RESPONSIVE DESIGN — SYSTEMATIC PHASE B BREAKPOINTS
    ========================================================================== */
-@media (max-width: 1050px) {
-  .workspace {
-    grid-template-columns: 64px 240px minmax(380px, 1fr);
+
+/* Header More Menu Dropdown & Drawer buttons */
+.header-more-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.header-more-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #13161f;
+  border: 1px solid var(--line-light);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  min-width: 180px;
+}
+
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #cbd5e1;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.more-item:hover {
+  background: #1f2533;
+  color: #fff;
+}
+
+.btn-drawer-close {
+  display: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.btn-drawer-close:hover {
+  color: #fff;
+  background: #252832;
+}
+
+.btn-toggle-inspector {
+  display: none;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: #1e2533;
+  border: 1px solid var(--line);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-toggle-inspector:hover {
+  color: #fff;
+  background: #283245;
+}
+
+/* Screen Too Small Warning (< 800px) */
+.screen-too-small-warning {
+  display: none;
+}
+
+@media (max-width: 799px) {
+  .screen-too-small-warning {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #0a0b0e;
+    color: #f1f3f7;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
   }
-  .inspector {
-    display: none;
+  .small-screen-card {
+    background: #141720;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 32px 24px;
+    max-width: 360px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  }
+  .small-screen-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+  .small-screen-card h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: #f1f3f7;
+  }
+  .small-screen-card p {
+    font-size: 12px;
+    color: #8b93a4;
+    line-height: 1.5;
   }
 }
 
-@media (max-width: 768px) {
-  .topbar {
-    gap: 10px;
-    padding: 0 12px;
+/* <= 1280px: Inspector becomes Drawer */
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: 72px 280px minmax(320px, 1fr) 0px;
   }
-  .brand span:not(.brand-mark):not(.beta), .help, .saved {
+  .splitter-vertical.splitter-right {
     display: none;
   }
+  .inspector {
+    position: fixed;
+    top: 58px;
+    right: -360px;
+    bottom: 0;
+    width: 340px;
+    height: calc(100dvh - 58px);
+    max-height: calc(100dvh - 58px);
+    z-index: 120;
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.85);
+    border-left: 1px solid var(--line-light);
+    transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+  }
+  .inspector.drawer-open {
+    right: 0;
+  }
+  #btnToggleInspectorDrawer {
+    display: flex !important;
+  }
+  #btnCloseInspectorDrawer {
+    display: flex !important;
+  }
+}
+
+/* <= 1024px: Thư viện (Asset panel) becomes Drawer & Header Compacts */
+@media (max-width: 1024px) {
   .workspace {
-    grid-template-columns: 58px 1fr;
+    grid-template-columns: 72px 1fr;
+  }
+  .splitter-vertical.splitter-left {
+    display: none;
   }
   .asset-panel {
+    position: fixed;
+    top: 58px;
+    left: -340px;
+    bottom: 0;
+    width: 320px;
+    height: calc(100dvh - 58px);
+    max-height: calc(100dvh - 58px);
+    z-index: 110;
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.85);
+    border-right: 1px solid var(--line-light);
+    transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+  }
+  .asset-panel.drawer-open {
+    left: 72px;
+  }
+  .asset-panel .btn-drawer-close {
+    display: flex !important;
+  }
+
+  /* Compact Topbar - No overflow at >= 800px */
+  .topbar {
+    padding: 0 12px;
+    gap: 10px;
+  }
+  .brand .beta {
     display: none;
   }
-  .stage {
-    grid-column: 2;
+  .saved {
+    display: none;
   }
-  .preview {
-    width: 230px;
+  .help {
+    display: none;
   }
+  .btn-hdr:not(.btn-hdr-qa) {
+    display: none;
+  }
+  #headerMoreBtn {
+    display: flex !important;
+  }
+  .project-select {
+    min-width: 130px;
+    max-width: 180px;
+    padding: 4px 8px;
+  }
+  .top-actions {
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .export-button {
+    padding: 6px 12px;
+  }
+}
+
+/* ==========================================================================
+   C2 & C3 STANDARDS: TOUCH TARGET (>=28px) & TEXT CONTRAST (>=4.5:1)
+   ========================================================================== */
+button:not(.inline-btn),
+select,
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.timeline-clip {
+  color: #ffffff;
+}
+
+.clip-title-text {
+  color: #ffffff;
+  font-size: 11px;
 }
