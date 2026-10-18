@@ -139,25 +139,24 @@ def launch_or_focus_capcut(timeout_sec: int = 10) -> bool:
         logger.info(f"Da dua cua so CapCut (HWND={existing_hwnds[0]}) len man hinh chinh.")
         return True
 
-    # Buoc 2: Kich hoat chay CapCut tuong tac
-    logger.info("CapCut chua mo, dang khoi dong phien lam viec...")
+    # Buoc 2: Kich hoat chay CapCut tuong tac duy nhat qua Task Scheduler tren Default Desktop
+    logger.info("CapCut chua mo, dang khoi dong phien lam viec tren Desktop chinh...")
+    bat_path = Path(__file__).parent / "launch_capcut_interactive.bat"
+    try:
+        subprocess.run([
+            "schtasks", "/create", "/tn", "OpenCapCutInteractive",
+            "/tr", f'cmd.exe /c "{bat_path}"',
+            "/sc", "once", "/st", "23:59", "/ru", "jinnr", "/it", "/f"
+        ], capture_output=True, text=True)
+    except Exception as e:
+        logger.warning(f"schtasks create error: {e}")
+
     try:
         res = subprocess.run(["schtasks", "/run", "/tn", "OpenCapCutInteractive"], capture_output=True, text=True)
         if res.returncode != 0:
-            logger.warning(f"schtasks output: {res.stderr or res.stdout}")
+            logger.warning(f"schtasks run output: {res.stderr or res.stdout}")
     except Exception as e:
         logger.warning(f"Khong the goi schtasks: {e}")
-
-    # Fallback truc tiep
-    if CAPCUT_EXE and Path(CAPCUT_EXE).exists():
-        try:
-            bat_path = Path(__file__).parent / "launch_capcut_interactive.bat"
-            if bat_path.exists():
-                subprocess.Popen(["cmd.exe", "/c", str(bat_path)], cwd=str(bat_path.parent))
-            else:
-                subprocess.Popen([str(CAPCUT_EXE)], cwd=str(Path(CAPCUT_EXE).parent))
-        except Exception as e:
-            logger.error(f"Fallback launch error: {e}")
 
     # Buoc 3: Cho cua so CapCut xuat hien va focus
     start_time = time.time()
