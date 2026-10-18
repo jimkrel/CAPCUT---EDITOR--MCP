@@ -26,8 +26,11 @@
 
     <!-- MAIN NAVIGATION TABS -->
     <nav class="hub-nav-tabs">
-      <button class="hub-tab-btn active" id="tabBtnCreate" onclick="switchTab('create')">
-        <span>✨</span> Tạo Dự Án Mới (13 Lớp MCP)
+      <button class="hub-tab-btn active" id="tabBtnAutoEdit" onclick="switchTab('autoedit')">
+        <span>⚡</span> AUTOEDIT (Cut on Beat)
+      </button>
+      <button class="hub-tab-btn" id="tabBtnCreate" onclick="switchTab('create')">
+        <span>✨</span> Tạo Thủ Công (13 Lớp)
       </button>
       <button class="hub-tab-btn" id="tabBtnProjects" onclick="switchTab('projects')">
         <span>📁</span> Dự Án CapCut Trên Máy
@@ -49,9 +52,129 @@
   <!-- MAIN HUB CONTENT CONTAINER -->
   <main class="hub-container">
     <!-- ========================================== -->
-    <!-- TAB 1: TẠO DỰ ÁN MỚI 13 LỚP MCP           -->
+    <!-- TAB 0: AUTOEDIT (EVENT RECAP & BEAT CUT)   -->
     <!-- ========================================== -->
-    <section class="hub-pane active" id="paneCreate">
+    <section class="hub-pane active" id="paneAutoEdit">
+      <div class="autoedit-shell">
+        <div class="autoedit-header">
+          <div class="autoedit-stepper">
+            <span class="autoedit-step-bar active"></span>
+            <span class="autoedit-step-bar active"></span>
+            <span class="autoedit-step-bar active"></span>
+            <span class="autoedit-step-bar active"></span>
+          </div>
+          <div class="autoedit-title-wrap">
+            <h1 class="autoedit-title">AUTOEDIT AI</h1>
+            <span class="autoedit-badge">Beat Sync Pro</span>
+          </div>
+          <p class="autoedit-subtitle">Tự động bắt nhịp beat nhạc, trích xuất thoại phỏng vấn & cắt B-roll chuẩn timeline CapCut Desktop</p>
+        </div>
+
+        <!-- 3 KHỐI NHẬP LIỆU CHUẨN ELEVEN PERCENT -->
+        <div class="autoedit-cards">
+          <!-- KHỐI 1: MUSIC TRACK -->
+          <div class="autoedit-card card-music">
+            <div class="card-head">
+              <div class="card-head-left">
+                <div class="card-icon-pill">🎵</div>
+                <div>
+                  <div class="card-title-text">Music Track</div>
+                  <div class="card-subtitle-text">MP3 / WAV only • Bắt buộc</div>
+                </div>
+              </div>
+              <div class="card-status-badge" id="badgeAutoeditMusic">Chờ chọn file</div>
+            </div>
+            <div class="autoedit-input-row">
+              <input type="text" id="autoeditMusicInput" class="autoedit-input" placeholder="Dán đường dẫn file nhạc (.mp3 / .wav) hoặc chọn file..." onchange="onAutoeditMusicChanged()">
+              <label class="btn-upload-accent btn-music-upload">
+                <span>📁 Chọn File</span>
+                <input type="file" id="fileMusicPicker" accept=".mp3,.wav,.m4a,.aac" style="display:none;" onchange="handleMusicFileSelect(event)">
+              </label>
+            </div>
+            <div class="card-foot-meta" id="metaAutoeditMusic">
+              <span>💡 Nhạc sẽ được quét FFT Onset để phát hiện BPM và nhịp trống (Beat markers).</span>
+            </div>
+          </div>
+
+          <!-- KHỐI 2: INTERVIEW CLIPS -->
+          <div class="autoedit-card card-interview">
+            <div class="card-head">
+              <div class="card-head-left">
+                <div class="card-icon-pill">🎙️</div>
+                <div>
+                  <div class="card-title-text">Interview Clips / VJ Video</div>
+                  <div class="card-subtitle-text">Tùy chọn • Tự động bóc câu thoại & dìm nhỏ nhạc (Ducking)</div>
+                </div>
+              </div>
+              <div class="card-status-badge" id="badgeAutoeditInterview">Tùy chọn</div>
+            </div>
+            <div class="autoedit-input-row">
+              <input type="text" id="autoeditInterviewInput" class="autoedit-input" placeholder="Dán đường dẫn video phỏng vấn / VJ (tùy chọn)...">
+              <label class="btn-upload-accent btn-interview-upload">
+                <span>📁 Chọn File</span>
+                <input type="file" id="fileInterviewPicker" accept=".mp4,.mov,.mkv" style="display:none;" onchange="handleInterviewFileSelect(event)">
+              </label>
+            </div>
+            <div class="card-foot-meta">
+              <span>💡 Dùng Whisper bóc câu nói, tự gắn phụ đề Safe Zone & ducking nhạc nền khi có tiếng nói.</span>
+            </div>
+          </div>
+
+          <!-- KHỐI 3: B-ROLL CLIPS -->
+          <div class="autoedit-card card-broll">
+            <div class="card-head">
+              <div class="card-head-left">
+                <div class="card-icon-pill">🎞️</div>
+                <div>
+                  <div class="card-title-text">B-roll Clips Folder</div>
+                  <div class="card-subtitle-text">Bắt buộc • Tự động cắt theo nhịp trống (Cut-on-Beat)</div>
+                </div>
+              </div>
+              <div class="card-status-badge" id="badgeAutoeditBroll">Bắt buộc</div>
+            </div>
+            <div class="autoedit-input-row">
+              <input type="text" id="autoeditBrollInput" class="autoedit-input" placeholder="Dán đường dẫn thư mục chứa video B-roll (ví dụ: C:/Footage/Broll)...">
+              <button class="btn-upload-accent btn-broll-upload" type="button" onclick="fillTestBrollSample()">
+                <span>⚡ Mẫu Test</span>
+              </button>
+            </div>
+            <div class="card-foot-meta">
+              <span>💡 Mỗi cảnh quay B-Roll sẽ được cắt khớp 100% với nốt beat của bài nhạc nền.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- THANH ĐIỀU CHỈNH NHỊP DỰNG (PACING) -->
+        <div class="autoedit-settings-bar">
+          <div class="pacing-select-group">
+            <span class="pacing-label">⚡ Nhịp dựng cắt theo Beat:</span>
+            <div class="pacing-pills">
+              <button type="button" class="pacing-pill active" id="pacingFast" onclick="setAutoeditPacing('fast')">⚡ Nhanh (Mỗi 1 Beat)</button>
+              <button type="button" class="pacing-pill" id="pacingMedium" onclick="setAutoeditPacing('medium')">🎯 Tiêu Chuẩn (Mỗi 2 Beats)</button>
+              <button type="button" class="pacing-pill" id="pacingCinematic" onclick="setAutoeditPacing('cinematic')">🎬 Cinematic (Mỗi 4 Beats)</button>
+            </div>
+          </div>
+          <div class="autoedit-proj-name">
+            <input type="text" id="autoeditProjectName" class="autoedit-input" style="width: 220px;" placeholder="Tên dự án CapCut...">
+          </div>
+        </div>
+
+        <!-- NÚT THỰC THI & LIVE FEEDBACK -->
+        <div class="autoedit-action-area">
+          <button class="btn-autoedit-execute" id="btnExecuteAutoEdit" type="button" onclick="runAutoEditPipeline()">
+            <span>🚀</span> AUTO EDIT & MỞ THẲNG TIMELINE CAPCUT
+          </button>
+          <div class="autoedit-status-feedback" id="autoeditStatusFeedback">
+            <span>● Sẵn sàng. Nhập file nhạc và bấm AUTO EDIT để tự động hóa toàn bộ.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 1: TẠO DỰ ÁN MỚI 13 LỚP MCP (THỦ CÔNG) -->
+    <!-- ========================================== -->
+    <section class="hub-pane" id="paneCreate">
       <div class="hub-create-grid">
         <!-- CỘT 1: NGUỒN FOOTAGE & SOURCE TÀI NGUYÊN -->
         <div class="hub-card">
@@ -245,6 +368,6 @@ Phong cách: Commercial sôi động, màu tươi sáng"></textarea>
   <!-- TOAST NOTIFICATIONS CONTAINER -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=autoedit1"></script>
 </body>
 </html>

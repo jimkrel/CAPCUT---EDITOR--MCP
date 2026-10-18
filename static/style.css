@@ -976,3 +976,355 @@ button:disabled {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   AUTOEDIT AI (EVENT & COMMERCIAL RECAP) — SLEEK 3-CARD LAYOUT
+   ========================================================================== */
+.autoedit-shell {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 40px;
+}
+
+.autoedit-header {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.autoedit-stepper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.autoedit-step-bar {
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.autoedit-step-bar.active {
+  background: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+.autoedit-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.autoedit-title {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.autoedit-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.autoedit-subtitle {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.autoedit-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.autoedit-card {
+  background: #111520;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.autoedit-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.autoedit-card.card-music {
+  border-left: 4px solid #facc15;
+}
+
+.autoedit-card.card-interview {
+  border-left: 4px solid #fb923c;
+}
+
+.autoedit-card.card-broll {
+  border-left: 4px solid #f87171;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-icon-pill {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.card-music .card-icon-pill {
+  background: rgba(250, 204, 21, 0.15);
+  color: #facc15;
+}
+
+.card-interview .card-icon-pill {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.card-broll .card-icon-pill {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.card-title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.card-subtitle-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-status-badge.badge-ready {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.autoedit-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.autoedit-input {
+  flex: 1;
+  background: #090c13;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: #ffffff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.autoedit-input:focus {
+  border-color: #f59e0b;
+}
+
+.btn-upload-accent {
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.btn-upload-accent:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-music-upload {
+  background: #facc15;
+  color: #000000;
+}
+
+.btn-interview-upload {
+  background: #fb923c;
+  color: #000000;
+}
+
+.btn-broll-upload {
+  background: #f87171;
+  color: #000000;
+}
+
+.card-foot-meta {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-foot-meta.meta-active {
+  color: #38bdf8;
+  font-weight: 500;
+}
+
+.autoedit-settings-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111520;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pacing-select-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pacing-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.pacing-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.pacing-pill {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pacing-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.pacing-pill.active {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.autoedit-action-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-autoedit-execute {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-autoedit-execute:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 12px 28px rgba(234, 88, 12, 0.5);
+}
+
+.btn-autoedit-execute:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.autoedit-status-feedback {
+  background: #090c13;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.autoedit-status-feedback.status-running {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.autoedit-status-feedback.status-success {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}

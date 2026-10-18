@@ -48,25 +48,179 @@ function showToast(message, type = 'info', duration = 3500) {
   }, duration);
 }
 
-// Chuyển Tab: 'create' hoặc 'projects'
+let currentAutoeditPacing = 'fast';
+
+// Chuyển Tab: 'autoedit', 'create', hoặc 'projects'
 function switchTab(tab) {
   activeTab = tab;
+  const tabBtnAutoEdit = document.getElementById('tabBtnAutoEdit');
   const tabBtnCreate = document.getElementById('tabBtnCreate');
   const tabBtnProjects = document.getElementById('tabBtnProjects');
+  const paneAutoEdit = document.getElementById('paneAutoEdit');
   const paneCreate = document.getElementById('paneCreate');
   const paneProjects = document.getElementById('paneProjects');
 
+  // Xóa active khỏi tất cả tab buttons & panes
+  [tabBtnAutoEdit, tabBtnCreate, tabBtnProjects].forEach(b => b?.classList.remove('active'));
+  [paneAutoEdit, paneCreate, paneProjects].forEach(p => p?.classList.remove('active'));
+
   if (tab === 'projects') {
-    tabBtnCreate?.classList.remove('active');
     tabBtnProjects?.classList.add('active');
-    paneCreate?.classList.remove('active');
     paneProjects?.classList.add('active');
     loadProjects(true);
-  } else {
-    tabBtnProjects?.classList.remove('active');
+  } else if (tab === 'create') {
     tabBtnCreate?.classList.add('active');
-    paneProjects?.classList.remove('active');
     paneCreate?.classList.add('active');
+  } else {
+    // Mặc định: autoedit
+    tabBtnAutoEdit?.classList.add('active');
+    paneAutoEdit?.classList.add('active');
+  }
+}
+
+// AUTOEDIT: Thay đổi nhịp Pacing
+function setAutoeditPacing(mode) {
+  currentAutoeditPacing = mode;
+  ['pacingFast', 'pacingMedium', 'pacingCinematic'].forEach(id => {
+    document.getElementById(id)?.classList.remove('active');
+  });
+  if (mode === 'fast') document.getElementById('pacingFast')?.classList.add('active');
+  else if (mode === 'medium') document.getElementById('pacingMedium')?.classList.add('active');
+  else if (mode === 'cinematic') document.getElementById('pacingCinematic')?.classList.add('active');
+}
+
+// AUTOEDIT: Tự động phân tích nhạc khi điền đường dẫn
+async function onAutoeditMusicChanged() {
+  const musicInput = document.getElementById('autoeditMusicInput');
+  const badge = document.getElementById('badgeAutoeditMusic');
+  const meta = document.getElementById('metaAutoeditMusic');
+  const musicPath = musicInput?.value.trim();
+
+  if (!musicPath) {
+    if (badge) { badge.textContent = 'Chờ chọn file'; badge.className = 'card-status-badge'; }
+    return;
+  }
+
+  if (badge) { badge.textContent = 'Đang dò Beat...'; badge.className = 'card-status-badge'; }
+
+  try {
+    const res = await fetch('/api/autoedit/analyze-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ musicPath })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (badge) {
+        badge.textContent = `BPM ${data.bpm} (${data.beat_count} beats)`;
+        badge.className = 'card-status-badge badge-ready';
+      }
+      if (meta) {
+        meta.className = 'card-foot-meta meta-active';
+        meta.innerHTML = `<span>✓ Đã bắt được ${data.beat_count} nhịp trống | Thời lượng: ${data.duration_sec}s | Nhịp: ${data.bpm} BPM.</span>`;
+      }
+      showToast(`Đã nhận diện nhịp nhạc: ${data.bpm} BPM (${data.beat_count} beats)`, 'success');
+    } else {
+      if (badge) { badge.textContent = 'Lỗi file'; badge.className = 'card-status-badge'; }
+      if (meta) meta.innerHTML = `<span style="color:#f87171;">⚠️ ${data.error || 'Không thể đọc file nhạc'}</span>`;
+    }
+  } catch (err) {
+    console.error('Lỗi phân tích nhạc:', err);
+  }
+}
+
+function handleMusicFileSelect(event) {
+  const file = event.target.files?.[0];
+  if (file) {
+    // Với trình duyệt, lấy tên file hoặc đường dẫn nếu có
+    const musicInput = document.getElementById('autoeditMusicInput');
+    if (musicInput && !musicInput.value) {
+      musicInput.value = file.name;
+    }
+  }
+}
+
+function handleInterviewFileSelect(event) {
+  const file = event.target.files?.[0];
+  if (file) {
+    const ivInput = document.getElementById('autoeditInterviewInput');
+    if (ivInput && !ivInput.value) {
+      ivInput.value = file.name;
+    }
+  }
+}
+
+// Điền mẫu Test nhanh
+function fillTestBrollSample() {
+  const musicInput = document.getElementById('autoeditMusicInput');
+  const brollInput = document.getElementById('autoeditBrollInput');
+  const nameInput = document.getElementById('autoeditProjectName');
+
+  if (musicInput) musicInput.value = "C:/Users/jinnr/.gemini/antigravity-ide/brain/67b581ec-6f5a-43e4-a378-9cd76587b492/tiktok_ref.mp4";
+  if (brollInput) brollInput.value = "c:/Users/jinnr/.gemini/antigravity-ide/scratch/capcut-web-studio/scratch/test_broll";
+  if (nameInput) nameInput.value = `AUTOEDIT_${Date.now().toString().slice(-4)}`;
+
+  onAutoeditMusicChanged();
+  showToast('Đã nạp sẵn dữ liệu mẫu Test!', 'info');
+}
+
+// Kích hoạt toàn trình AUTOEDIT 1-CLICK
+async function runAutoEditPipeline() {
+  const musicPath = document.getElementById('autoeditMusicInput')?.value.trim();
+  const interviewPath = document.getElementById('autoeditInterviewInput')?.value.trim();
+  const brollFolder = document.getElementById('autoeditBrollInput')?.value.trim();
+  const projectName = document.getElementById('autoeditProjectName')?.value.trim() || `AUTOEDIT_${Date.now().toString().slice(-4)}`;
+  const feedback = document.getElementById('autoeditStatusFeedback');
+  const btn = document.getElementById('btnExecuteAutoEdit');
+
+  if (!musicPath) {
+    showToast('Vui lòng chọn hoặc dán đường dẫn file nhạc (Music Track)!', 'warn');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳</span> ĐANG AUTO EDIT & TẠO TIMELINE...'; }
+  if (feedback) {
+    feedback.className = 'autoedit-status-feedback status-running';
+    feedback.innerHTML = '<span class="scanner-spinner"></span> <span>Đang dò Beat, bóc tách thoại & cắt B-Roll chuẩn từng nhịp trống...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/autoedit/build', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectName,
+        musicPath,
+        interviewPath,
+        brollFolder,
+        pacingMode: currentAutoeditPacing,
+        openCapcut: true
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.detail || data.error || 'Lỗi không xác định khi biên dịch');
+    }
+
+    if (feedback) {
+      feedback.className = 'autoedit-status-feedback status-success';
+      feedback.innerHTML = `<span>✓ HOÀN TẤT! Dự án "${data.projectName}" đã được tạo với ${data.brollCutsCount} cuts theo nhịp beat (${data.bpm} BPM). CapCut Desktop đang mở!</span>`;
+    }
+
+    showToast(`✓ Đã tự động tạo và nạp dự án "${data.projectName}" vào CapCut Desktop!`, 'success', 5000);
+  } catch (err) {
+    console.error('Lỗi AutoEdit:', err);
+    if (feedback) {
+      feedback.className = 'autoedit-status-feedback';
+      feedback.innerHTML = `<span style="color:#f87171;">✕ Lỗi: ${err.message}</span>`;
+    }
+    showToast(`Lỗi: ${err.message}`, 'error', 5000);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🚀</span> AUTO EDIT & MỞ THẲNG TIMELINE CAPCUT';
+    }
   }
 }
 

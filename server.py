@@ -2128,6 +2128,42 @@ def api_capcut_open_project(req: OpenProjectRequest):
     except Exception as e:
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
 
+class AnalyzeMusicRequest(BaseModel):
+    musicPath: str
+
+@app.post("/api/autoedit/analyze-music")
+def api_autoedit_analyze_music(req: AnalyzeMusicRequest):
+    try:
+        import autoedit_engine
+        res = autoedit_engine.detect_audio_beats(req.musicPath)
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+
+class AutoEditBuildRequest(BaseModel):
+    projectName: Optional[str] = ""
+    musicPath: str
+    interviewPath: Optional[str] = ""
+    brollFolder: Optional[str] = ""
+    pacingMode: Optional[str] = "medium"
+    openCapcut: Optional[bool] = True
+
+@app.post("/api/autoedit/build")
+def api_autoedit_build(req: AutoEditBuildRequest):
+    try:
+        import autoedit_engine
+        res = autoedit_engine.run_autoedit(
+            music_path=req.musicPath,
+            interview_path=req.interviewPath or "",
+            broll_folder=req.brollFolder or "",
+            pacing_mode=req.pacingMode or "medium",
+            project_name=req.projectName or "",
+            open_capcut=req.openCapcut if req.openCapcut is not None else True
+        )
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
